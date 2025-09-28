@@ -1,0 +1,23 @@
+services:
+  - type: web
+    name: crypto-forex-backend
+    env: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        fromService:
+          type: web
+          name: crypto-forex-backend
+          property: port
+      # Add your MongoDB Atlas URI and other production secrets via Render dashboard
+      - key: MONGODB_URI
+        sync: false # Set this via Render dashboard
+      - key: JWT_SECRET
+        sync: false # Set this via Render dashboard
+      - key: FRONTEND_URL
+        value: https://crypto-forex-gilt.vercel.app
