@@ -4,9 +4,10 @@
   "main": "src/index.js",
   "type": "module",
   "scripts": {
-    "dev": "nodemon src/index.js",
-    "start": "node src/index.js",
-    "prisma": "prisma"
+  "dev": "nodemon src/index.js",
+  "prisma:migrate": "prisma migrate deploy",
+  "start": "npm run prisma:migrate && node src/index.js",
+  "prisma": "prisma"
   },
   "dependencies": {
     "express": "^4.18.2",
