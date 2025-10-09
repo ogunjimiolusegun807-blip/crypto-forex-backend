@@ -1,9 +1,8 @@
 import express from 'express';
-import { PrismaClient } from '@prisma/client';
 import jwt from 'jsonwebtoken';
+import User from '../models/User.js';
 
 const router = express.Router();
-const prisma = new PrismaClient();
 const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret';
 
 // Middleware to verify JWT and attach user to request
@@ -21,16 +20,12 @@ function authenticateToken(req, res, next) {
 // GET /api/user/profile - Get user profile
 router.get('/profile', authenticateToken, async (req, res) => {
   try {
-    const user = await prisma.user.findUnique({ where: { id: req.userId } });
+    const user = await User.findByPk(req.userId);
     if (!user) return res.status(404).json({ error: 'User not found.' });
     res.json({
       id: user.id,
-      username: user.username,
-      email: user.email,
-      kycStatus: user.kycStatus,
-      balance: user.balance,
-      activities: user.activities,
-      createdAt: user.createdAt
+      username: user.name,
+      email: user.email
     });
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch profile.' });
