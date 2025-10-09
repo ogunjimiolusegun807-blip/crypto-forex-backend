@@ -5,7 +5,11 @@ import profileRoutes from './routes/profileroutes.js';
 
 const app = express();
 app.use(cors({
-  origin: ['http://localhost:3000', 'https://crypto-forex-three.vercel.app'],
+  origin: [
+    'http://localhost:3000',
+    'https://crypto-forex-three.vercel.app',
+    'https://crypto-forex-three-git-main-ogunjimiolusegun807-blip.vercel.app'
+  ],
   credentials: true
 }));
 app.use(express.json());
