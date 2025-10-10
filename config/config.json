@@ -14,10 +14,11 @@
     "dialect": "postgres"
   },
   "production": {
-    "username": "your_production_db_user",
-    "password": "your_production_db_password",
-    "database": "your_production_db_name",
-    "host": "your_production_db_host",
+    "username": "postgres.acztowecmwokivdjbycc",
+    "password": "DIATECK245161",
+    "database": "postgres",
+    "host": "aws-1-us-east-1.pooler.supabase.com",
+    "port": 6543,
     "dialect": "postgres"
   }
 }
