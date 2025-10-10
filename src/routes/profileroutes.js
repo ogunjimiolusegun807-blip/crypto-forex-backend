@@ -28,6 +28,7 @@ router.get('/profile', authenticateToken, async (req, res) => {
       email: user.email
     });
   } catch (err) {
+    console.error('Profile error:', err);
     res.status(500).json({ error: 'Failed to fetch profile.' });
   }
 });
@@ -46,6 +47,7 @@ router.post('/deposit', authenticateToken, async (req, res) => {
     await user.save();
     res.json({ balance: user.balance, activity: depositActivity });
   } catch (err) {
+    console.error('Deposit error:', err);
     res.status(500).json({ error: 'Deposit failed.' });
   }
 });
@@ -58,6 +60,7 @@ router.get('/deposits', authenticateToken, async (req, res) => {
     const deposits = (user.activities || []).filter(a => a.type === 'deposit');
     res.json({ deposits });
   } catch (err) {
+    console.error('Deposits error:', err);
     res.status(500).json({ error: 'Failed to fetch deposits.' });
   }
 });
@@ -76,6 +79,7 @@ router.post('/withdrawal', authenticateToken, async (req, res) => {
     await user.save();
     res.json({ balance: user.balance, activity: withdrawalActivity });
   } catch (err) {
+    console.error('Withdrawal error:', err);
     res.status(500).json({ error: 'Withdrawal failed.' });
   }
 });
@@ -88,6 +92,7 @@ router.get('/withdrawals', authenticateToken, async (req, res) => {
     const withdrawals = (user.activities || []).filter(a => a.type === 'withdrawal');
     res.json({ withdrawals });
   } catch (err) {
+    console.error('Withdrawals error:', err);
     res.status(500).json({ error: 'Failed to fetch withdrawals.' });
   }
 });
@@ -104,6 +109,7 @@ router.post('/plan', authenticateToken, async (req, res) => {
     await user.save();
     res.json({ activity: planActivity });
   } catch (err) {
+    console.error('Plan error:', err);
     res.status(500).json({ error: 'Plan subscription failed.' });
   }
 });
@@ -116,6 +122,7 @@ router.get('/plans', authenticateToken, async (req, res) => {
     const plans = (user.activities || []).filter(a => a.type === 'plan');
     res.json({ plans });
   } catch (err) {
+    console.error('Plans error:', err);
     res.status(500).json({ error: 'Failed to fetch plans.' });
   }
 });
@@ -132,6 +139,7 @@ router.post('/signal/subscribe', authenticateToken, async (req, res) => {
     await user.save();
     res.json({ activity: signalActivity });
   } catch (err) {
+    console.error('Signal error:', err);
     res.status(500).json({ error: 'Signal subscription failed.' });
   }
 });
@@ -144,6 +152,7 @@ router.get('/signals', authenticateToken, async (req, res) => {
     const signals = (user.activities || []).filter(a => a.type === 'signal');
     res.json({ signals });
   } catch (err) {
+    console.error('Signals error:', err);
     res.status(500).json({ error: 'Failed to fetch signals.' });
   }
 });
@@ -160,6 +169,7 @@ router.post('/kyc', authenticateToken, async (req, res) => {
     await user.save();
     res.json({ kycStatus: user.kycStatus });
   } catch (err) {
+    console.error('KYC error:', err);
     res.status(500).json({ error: 'KYC submission failed.' });
   }
 });
@@ -172,6 +182,7 @@ router.get('/kyc', authenticateToken, async (req, res) => {
     const kycActivities = (user.activities || []).filter(a => a.type === 'kyc');
     res.json({ kycStatus: user.kycStatus, kycActivities });
   } catch (err) {
+    console.error('KYC fetch error:', err);
     res.status(500).json({ error: 'Failed to fetch KYC status.' });
   }
 });
@@ -187,6 +198,7 @@ router.put('/settings', authenticateToken, async (req, res) => {
     await user.save();
     res.json({ settings });
   } catch (err) {
+    console.error('Settings error:', err);
     res.status(500).json({ error: 'Settings update failed.' });
   }
 });
@@ -199,6 +211,7 @@ router.get('/settings', authenticateToken, async (req, res) => {
     const settingsActivities = (user.activities || []).filter(a => a.type === 'settings');
     res.json({ settingsActivities });
   } catch (err) {
+    console.error('Settings fetch error:', err);
     res.status(500).json({ error: 'Failed to fetch settings.' });
   }
 });
@@ -214,6 +227,7 @@ router.post('/referral', authenticateToken, async (req, res) => {
     await user.save();
     res.json({ referredEmail });
   } catch (err) {
+    console.error('Referral error:', err);
     res.status(500).json({ error: 'Referral failed.' });
   }
 });
@@ -226,6 +240,7 @@ router.get('/referrals', authenticateToken, async (req, res) => {
     const referrals = (user.activities || []).filter(a => a.type === 'referral');
     res.json({ referrals });
   } catch (err) {
+    console.error('Referrals error:', err);
     res.status(500).json({ error: 'Failed to fetch referrals.' });
   }
 });
