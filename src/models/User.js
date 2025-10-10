@@ -30,11 +30,11 @@ const User = sequelize.define('User', {
     allowNull: false,
     defaultValue: 0,
   },
-  activities: {
-    type: DataTypes.JSON,
-    allowNull: false,
-    defaultValue: {},
-  },
+    activities: {
+      type: DataTypes.JSON,
+      allowNull: false,
+      defaultValue: [],
+    },
   createdAt: {
     type: DataTypes.DATE,
     allowNull: false,
