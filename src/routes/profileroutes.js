@@ -36,20 +36,33 @@ router.get('/profile', authenticateToken, async (req, res) => {
 
 // POST /api/user/deposit
 router.post('/deposit', authenticateToken, async (req, res) => {
-  const { amount } = req.body;
-  if (!amount || amount <= 0) return res.status(400).json({ error: 'Invalid amount.' });
-  try {
-    const user = await User.findByPk(req.userId);
-    if (!user) return res.status(404).json({ error: 'User not found.' });
-    user.balance += amount;
-    const depositActivity = { type: 'deposit', amount, date: new Date() };
-    user.activities = [...(user.activities || []), depositActivity];
-    await user.save();
-    res.json({ balance: user.balance, activity: depositActivity });
-  } catch (err) {
-    console.error('Deposit error:', err);
-    res.status(500).json({ error: 'Deposit failed.' });
-  }
+  // Use multer for file upload
+  const multer = (await import('multer')).default;
+  const upload = multer({ dest: 'uploads/' });
+  upload.single('proof')(req, res, async function (err) {
+    if (err) {
+      console.error('Multer error:', err);
+      return res.status(500).json({ error: 'File upload failed.' });
+    }
+    const amount = req.body.amount;
+    if (!amount || amount <= 0) return res.status(400).json({ error: 'Invalid amount.' });
+    try {
+      const user = await User.findByPk(req.userId);
+      if (!user) return res.status(404).json({ error: 'User not found.' });
+      user.balance += Number(amount);
+      let proofUrl = null;
+      if (req.file) {
+        proofUrl = `/uploads/${req.file.filename}`;
+      }
+      const depositActivity = { type: 'deposit', amount: Number(amount), date: new Date(), proof: proofUrl };
+      user.activities = [...(user.activities || []), depositActivity];
+      await user.save();
+      res.json({ balance: user.balance, activity: depositActivity });
+    } catch (err) {
+      console.error('Deposit error:', err);
+      res.status(500).json({ error: 'Deposit failed.' });
+    }
+  });
 });
 
 // GET /api/user/deposits
