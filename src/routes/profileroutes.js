@@ -32,4 +32,202 @@ router.get('/profile', authenticateToken, async (req, res) => {
   }
 });
 
+
+// POST /api/user/deposit
+router.post('/deposit', authenticateToken, async (req, res) => {
+  const { amount } = req.body;
+  if (!amount || amount <= 0) return res.status(400).json({ error: 'Invalid amount.' });
+  try {
+    const user = await User.findByPk(req.userId);
+    if (!user) return res.status(404).json({ error: 'User not found.' });
+    user.balance += amount;
+    const depositActivity = { type: 'deposit', amount, date: new Date() };
+    user.activities = [...(user.activities || []), depositActivity];
+    await user.save();
+    res.json({ balance: user.balance, activity: depositActivity });
+  } catch (err) {
+    res.status(500).json({ error: 'Deposit failed.' });
+  }
+});
+
+// GET /api/user/deposits
+router.get('/deposits', authenticateToken, async (req, res) => {
+  try {
+    const user = await User.findByPk(req.userId);
+    if (!user) return res.status(404).json({ error: 'User not found.' });
+    const deposits = (user.activities || []).filter(a => a.type === 'deposit');
+    res.json({ deposits });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch deposits.' });
+  }
+});
+
+// POST /api/user/withdrawal
+router.post('/withdrawal', authenticateToken, async (req, res) => {
+  const { amount } = req.body;
+  if (!amount || amount <= 0) return res.status(400).json({ error: 'Invalid amount.' });
+  try {
+    const user = await User.findByPk(req.userId);
+    if (!user) return res.status(404).json({ error: 'User not found.' });
+    if (user.balance < amount) return res.status(400).json({ error: 'Insufficient balance.' });
+    user.balance -= amount;
+    const withdrawalActivity = { type: 'withdrawal', amount, date: new Date() };
+    user.activities = [...(user.activities || []), withdrawalActivity];
+    await user.save();
+    res.json({ balance: user.balance, activity: withdrawalActivity });
+  } catch (err) {
+    res.status(500).json({ error: 'Withdrawal failed.' });
+  }
+});
+
+// GET /api/user/withdrawals
+router.get('/withdrawals', authenticateToken, async (req, res) => {
+  try {
+    const user = await User.findByPk(req.userId);
+    if (!user) return res.status(404).json({ error: 'User not found.' });
+    const withdrawals = (user.activities || []).filter(a => a.type === 'withdrawal');
+    res.json({ withdrawals });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch withdrawals.' });
+  }
+});
+
+// POST /api/user/plan
+router.post('/plan', authenticateToken, async (req, res) => {
+  const { planId } = req.body;
+  if (!planId) return res.status(400).json({ error: 'Plan ID required.' });
+  try {
+    const user = await User.findByPk(req.userId);
+    if (!user) return res.status(404).json({ error: 'User not found.' });
+    const planActivity = { type: 'plan', planId, date: new Date() };
+    user.activities = [...(user.activities || []), planActivity];
+    await user.save();
+    res.json({ activity: planActivity });
+  } catch (err) {
+    res.status(500).json({ error: 'Plan subscription failed.' });
+  }
+});
+
+// GET /api/user/plans
+router.get('/plans', authenticateToken, async (req, res) => {
+  try {
+    const user = await User.findByPk(req.userId);
+    if (!user) return res.status(404).json({ error: 'User not found.' });
+    const plans = (user.activities || []).filter(a => a.type === 'plan');
+    res.json({ plans });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch plans.' });
+  }
+});
+
+// POST /api/user/signal/subscribe
+router.post('/signal/subscribe', authenticateToken, async (req, res) => {
+  const { signalId } = req.body;
+  if (!signalId) return res.status(400).json({ error: 'Signal ID required.' });
+  try {
+    const user = await User.findByPk(req.userId);
+    if (!user) return res.status(404).json({ error: 'User not found.' });
+    const signalActivity = { type: 'signal', signalId, date: new Date() };
+    user.activities = [...(user.activities || []), signalActivity];
+    await user.save();
+    res.json({ activity: signalActivity });
+  } catch (err) {
+    res.status(500).json({ error: 'Signal subscription failed.' });
+  }
+});
+
+// GET /api/user/signals
+router.get('/signals', authenticateToken, async (req, res) => {
+  try {
+    const user = await User.findByPk(req.userId);
+    if (!user) return res.status(404).json({ error: 'User not found.' });
+    const signals = (user.activities || []).filter(a => a.type === 'signal');
+    res.json({ signals });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch signals.' });
+  }
+});
+
+// POST /api/user/kyc
+router.post('/kyc', authenticateToken, async (req, res) => {
+  const { kycData } = req.body;
+  if (!kycData) return res.status(400).json({ error: 'KYC data required.' });
+  try {
+    const user = await User.findByPk(req.userId);
+    if (!user) return res.status(404).json({ error: 'User not found.' });
+    user.kycStatus = 'pending';
+    user.activities = [...(user.activities || []), { type: 'kyc', kycData, date: new Date() }];
+    await user.save();
+    res.json({ kycStatus: user.kycStatus });
+  } catch (err) {
+    res.status(500).json({ error: 'KYC submission failed.' });
+  }
+});
+
+// GET /api/user/kyc
+router.get('/kyc', authenticateToken, async (req, res) => {
+  try {
+    const user = await User.findByPk(req.userId);
+    if (!user) return res.status(404).json({ error: 'User not found.' });
+    const kycActivities = (user.activities || []).filter(a => a.type === 'kyc');
+    res.json({ kycStatus: user.kycStatus, kycActivities });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch KYC status.' });
+  }
+});
+
+// PUT /api/user/settings
+router.put('/settings', authenticateToken, async (req, res) => {
+  const { settings } = req.body;
+  if (!settings) return res.status(400).json({ error: 'Settings required.' });
+  try {
+    const user = await User.findByPk(req.userId);
+    if (!user) return res.status(404).json({ error: 'User not found.' });
+    user.activities = [...(user.activities || []), { type: 'settings', settings, date: new Date() }];
+    await user.save();
+    res.json({ settings });
+  } catch (err) {
+    res.status(500).json({ error: 'Settings update failed.' });
+  }
+});
+
+// GET /api/user/settings
+router.get('/settings', authenticateToken, async (req, res) => {
+  try {
+    const user = await User.findByPk(req.userId);
+    if (!user) return res.status(404).json({ error: 'User not found.' });
+    const settingsActivities = (user.activities || []).filter(a => a.type === 'settings');
+    res.json({ settingsActivities });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch settings.' });
+  }
+});
+
+// POST /api/user/referral
+router.post('/referral', authenticateToken, async (req, res) => {
+  const { referredEmail } = req.body;
+  if (!referredEmail) return res.status(400).json({ error: 'Referred email required.' });
+  try {
+    const user = await User.findByPk(req.userId);
+    if (!user) return res.status(404).json({ error: 'User not found.' });
+    user.activities = [...(user.activities || []), { type: 'referral', referredEmail, date: new Date() }];
+    await user.save();
+    res.json({ referredEmail });
+  } catch (err) {
+    res.status(500).json({ error: 'Referral failed.' });
+  }
+});
+
+// GET /api/user/referrals
+router.get('/referrals', authenticateToken, async (req, res) => {
+  try {
+    const user = await User.findByPk(req.userId);
+    if (!user) return res.status(404).json({ error: 'User not found.' });
+    const referrals = (user.activities || []).filter(a => a.type === 'referral');
+    res.json({ referrals });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch referrals.' });
+  }
+});
+
 export default router;

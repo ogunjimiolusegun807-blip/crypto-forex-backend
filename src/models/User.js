@@ -19,6 +19,26 @@ const User = sequelize.define('User', {
   name: {
     type: DataTypes.STRING,
     allowNull: false,
+  },
+  kycStatus: {
+    type: DataTypes.STRING,
+    allowNull: false,
+    defaultValue: 'unverified',
+  },
+  balance: {
+    type: DataTypes.FLOAT,
+    allowNull: false,
+    defaultValue: 0,
+  },
+  activities: {
+    type: DataTypes.JSON,
+    allowNull: false,
+    defaultValue: {},
+  },
+  createdAt: {
+    type: DataTypes.DATE,
+    allowNull: false,
+    defaultValue: DataTypes.NOW,
   }
 }, {
   tableName: 'users',
