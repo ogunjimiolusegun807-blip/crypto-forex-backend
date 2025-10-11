@@ -73,6 +73,41 @@ router.post('/login', async (req, res) => {
   }
 });
 
+
+// Admin Login (super admin only)
+router.post('/admin/login', async (req, res) => {
+  const { email, password } = req.body;
+  if (!email || !password) {
+    return res.status(400).json({ error: 'Email and password required.' });
+  }
+  try {
+    // Only allow super admin
+    if (email !== 'admin@elonbroker.com') {
+      return res.status(403).json({ error: 'Forbidden.' });
+    }
+    const admin = await User.findOne({ where: { email } });
+    if (!admin) {
+      return res.status(404).json({ error: 'Admin not found.' });
+    }
+    const valid = await bcrypt.compare(password, admin.password);
+    if (!valid) {
+      return res.status(401).json({ error: 'Invalid credentials.' });
+    }
+    const token = jwt.sign({ userId: admin.id, role: 'admin' }, JWT_SECRET, { expiresIn: '7d' });
+    res.json({
+      token,
+      admin: {
+        id: admin.id,
+        username: admin.name,
+        email: admin.email
+      },
+    });
+  } catch (err) {
+    console.error('Admin login error:', err);
+    res.status(500).json({ error: 'Admin login failed.' });
+  }
+});
+
 // Change admin password
 router.put('/admin/change-password', async (req, res) => {
   const { email, oldPassword, newPassword } = req.body;
