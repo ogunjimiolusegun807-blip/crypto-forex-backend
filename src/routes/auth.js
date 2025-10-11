@@ -73,4 +73,33 @@ router.post('/login', async (req, res) => {
   }
 });
 
+// Change admin password
+router.put('/admin/change-password', async (req, res) => {
+  const { email, oldPassword, newPassword } = req.body;
+  if (!email || !oldPassword || !newPassword) {
+    return res.status(400).json({ error: 'All fields are required.' });
+  }
+  try {
+    // Only allow super admin
+    if (email !== 'admin@elonbroker.com') {
+      return res.status(403).json({ error: 'Forbidden.' });
+    }
+    const admin = await User.findOne({ where: { email } });
+    if (!admin) {
+      return res.status(404).json({ error: 'Admin not found.' });
+    }
+    const valid = await bcrypt.compare(oldPassword, admin.password);
+    if (!valid) {
+      return res.status(401).json({ error: 'Old password incorrect.' });
+    }
+    const newHash = await bcrypt.hash(newPassword, 10);
+    admin.password = newHash;
+    await admin.save();
+    res.json({ success: true, message: 'Password updated.' });
+  } catch (err) {
+    console.error('Admin password change error:', err);
+    res.status(500).json({ error: 'Password update failed.' });
+  }
+});
+
 export default router;

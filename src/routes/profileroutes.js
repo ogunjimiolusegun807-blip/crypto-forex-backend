@@ -1,11 +1,31 @@
 import express from 'express';
+import { v2 as cloudinary } from 'cloudinary';
+import { CloudinaryStorage } from 'multer-storage-cloudinary';
 import jwt from 'jsonwebtoken';
 import User from '../models/User.js';
 
 const router = express.Router();
+// Cloudinary config (use environment variables for credentials)
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET
+});
+
+const storage = new CloudinaryStorage({
+  cloudinary,
+  params: {
+    folder: 'deposit_proofs',
+    allowed_formats: ['jpg', 'jpeg', 'png', 'pdf']
+  }
+});
+
+const multer = (await import('multer')).default;
+const upload = multer({ storage });
 const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret';
 
 // Middleware to verify JWT and attach user to request
+import { Plan, Signal } from '../models/index.js';
 function authenticateToken(req, res, next) {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
@@ -36,9 +56,6 @@ router.get('/profile', authenticateToken, async (req, res) => {
 
 // POST /api/user/deposit
 router.post('/deposit', authenticateToken, async (req, res) => {
-  // Use multer for file upload
-  const multer = (await import('multer')).default;
-  const upload = multer({ dest: 'uploads/' });
   upload.single('proof')(req, res, async function (err) {
     if (err) {
       console.error('Multer error:', err);
@@ -51,11 +68,15 @@ router.post('/deposit', authenticateToken, async (req, res) => {
       if (!user) return res.status(404).json({ error: 'User not found.' });
       user.balance += Number(amount);
       let proofUrl = null;
-      if (req.file) {
-        proofUrl = `/uploads/${req.file.filename}`;
+      if (req.file && req.file.path) {
+        proofUrl = req.file.path; // Cloudinary URL
+      }
+      // Ensure activities is always an array
+      if (!Array.isArray(user.activities)) {
+        user.activities = [];
       }
       const depositActivity = { type: 'deposit', amount: Number(amount), date: new Date(), proof: proofUrl };
-      user.activities = [...(user.activities || []), depositActivity];
+      user.activities = [...user.activities, depositActivity];
       await user.save();
       res.json({ balance: user.balance, activity: depositActivity });
     } catch (err) {
@@ -70,7 +91,8 @@ router.get('/deposits', authenticateToken, async (req, res) => {
   try {
     const user = await User.findByPk(req.userId);
     if (!user) return res.status(404).json({ error: 'User not found.' });
-    const deposits = (user.activities || []).filter(a => a.type === 'deposit');
+  const activities = Array.isArray(user.activities) ? user.activities : [];
+  const deposits = activities.filter(a => a.type === 'deposit');
     res.json({ deposits });
   } catch (err) {
     console.error('Deposits error:', err);
@@ -112,15 +134,20 @@ router.get('/withdrawals', authenticateToken, async (req, res) => {
 
 // POST /api/user/plan
 router.post('/plan', authenticateToken, async (req, res) => {
-  const { planId } = req.body;
+  const { planId, amount } = req.body;
   if (!planId) return res.status(400).json({ error: 'Plan ID required.' });
+  if (!amount || amount <= 0) return res.status(400).json({ error: 'Investment amount required.' });
   try {
     const user = await User.findByPk(req.userId);
     if (!user) return res.status(404).json({ error: 'User not found.' });
-    const planActivity = { type: 'plan', planId, date: new Date() };
+    if (user.balance < amount) {
+      return res.status(400).json({ error: 'Insufficient balance.' });
+    }
+    user.balance -= Number(amount);
+    const planActivity = { type: 'plan', planId, amount: Number(amount), date: new Date() };
     user.activities = [...(user.activities || []), planActivity];
     await user.save();
-    res.json({ activity: planActivity });
+    res.json({ balance: user.balance, activity: planActivity });
   } catch (err) {
     console.error('Plan error:', err);
     res.status(500).json({ error: 'Plan subscription failed.' });
