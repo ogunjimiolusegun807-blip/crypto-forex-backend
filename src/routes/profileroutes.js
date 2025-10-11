@@ -133,15 +133,20 @@ router.get('/withdrawals', authenticateToken, async (req, res) => {
 
 // POST /api/user/plan
 router.post('/plan', authenticateToken, async (req, res) => {
-  const { planId } = req.body;
+  const { planId, amount } = req.body;
   if (!planId) return res.status(400).json({ error: 'Plan ID required.' });
+  if (!amount || amount <= 0) return res.status(400).json({ error: 'Investment amount required.' });
   try {
     const user = await User.findByPk(req.userId);
     if (!user) return res.status(404).json({ error: 'User not found.' });
-    const planActivity = { type: 'plan', planId, date: new Date() };
+    if (user.balance < amount) {
+      return res.status(400).json({ error: 'Insufficient balance.' });
+    }
+    user.balance -= Number(amount);
+    const planActivity = { type: 'plan', planId, amount: Number(amount), date: new Date() };
     user.activities = [...(user.activities || []), planActivity];
     await user.save();
-    res.json({ activity: planActivity });
+    res.json({ balance: user.balance, activity: planActivity });
   } catch (err) {
     console.error('Plan error:', err);
     res.status(500).json({ error: 'Plan subscription failed.' });
