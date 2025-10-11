@@ -8,11 +8,7 @@ import sequelize from './models/index.js';
 const app = express();
 
 const corsOptions = {
-  origin: [
-    'http://localhost:3000',
-    'https://crypto-forex-three.vercel.app',
-    'https://crypto-forex-three-git-main-ogunjimiolusegun807-blip.vercel.app'
-  ],
+  origin: '*', // Allow all origins for debugging
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
@@ -21,6 +17,19 @@ const corsOptions = {
 app.use(cors(corsOptions));
 app.options('*', cors(corsOptions));
 app.use(express.json());
+
+// Debug: Log CORS headers for every response
+app.use((req, res, next) => {
+  res.on('finish', () => {
+    console.log('CORS headers:', {
+      'Access-Control-Allow-Origin': res.getHeader('Access-Control-Allow-Origin'),
+      'Access-Control-Allow-Credentials': res.getHeader('Access-Control-Allow-Credentials'),
+      'Access-Control-Allow-Methods': res.getHeader('Access-Control-Allow-Methods'),
+      'Access-Control-Allow-Headers': res.getHeader('Access-Control-Allow-Headers'),
+    });
+  });
+  next();
+});
 
 app.use('/api/auth', authRoutes);
 app.use('/api/user', profileRoutes);
