@@ -2,7 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import authRoutes from './routes/auth.js';
 import profileRoutes from './routes/profileroutes.js';
-import sequelize from './models/index.js';
+import { sequelize } from './models/index.js';
 
 
 const app = express();
