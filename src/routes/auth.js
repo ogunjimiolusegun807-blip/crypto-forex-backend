@@ -306,11 +306,12 @@ router.post('/admin/kyc/:activityId/approve', requireAdmin, async (req, res) => 
       const activities = Array.isArray(user.activities) ? user.activities : [];
       const idx = activities.findIndex(a => a.id === activityId && a.type === 'kyc');
       if (idx !== -1) {
-        user.kycStatus = 'verified';
-        activities[idx].status = 'verified';
-        user.activities = activities;
-        await user.save();
-        return res.json({ success: true, userId: user.id });
+  user.kycStatus = 'verified';
+  // remove the handled kyc activity so it doesn't reappear
+  const updatedActivities = activities.filter((_, i) => i !== idx);
+  user.activities = updatedActivities;
+  await user.save();
+  return res.json({ success: true, userId: user.id });
       }
     }
     res.status(404).json({ error: 'KYC activity not found.' });
@@ -329,11 +330,12 @@ router.post('/admin/kyc/:activityId/reject', requireAdmin, async (req, res) => {
       const activities = Array.isArray(user.activities) ? user.activities : [];
       const idx = activities.findIndex(a => a.id === activityId && a.type === 'kyc');
       if (idx !== -1) {
-        user.kycStatus = 'rejected';
-        activities[idx].status = 'rejected';
-        user.activities = activities;
-        await user.save();
-        return res.json({ success: true, userId: user.id });
+  user.kycStatus = 'rejected';
+  // remove the handled kyc activity
+  const updatedActivities = activities.filter((_, i) => i !== idx);
+  user.activities = updatedActivities;
+  await user.save();
+  return res.json({ success: true, userId: user.id });
       }
     }
     res.status(404).json({ error: 'KYC activity not found.' });
@@ -397,13 +399,13 @@ router.post('/admin/deposits/:activityId/approve', requireAdmin, async (req, res
       const activities = Array.isArray(user.activities) ? user.activities : [];
       const idx = activities.findIndex(a => a.id === activityId && a.type === 'deposit');
       if (idx !== -1) {
-        // credit balance and mark activity approved
-        const amt = overrideAmount !== null ? overrideAmount : Number(activities[idx].amount || 0);
-        user.balance = Number(user.balance) + amt;
-        activities[idx].status = 'approved';
-        user.activities = activities;
-        await user.save();
-        return res.json({ success: true, userId: user.id, balance: user.balance });
+  // credit balance and remove the handled activity
+  const amt = overrideAmount !== null ? overrideAmount : Number(activities[idx].amount || 0);
+  user.balance = Number(user.balance) + amt;
+  const updatedActivities = activities.filter((_, i) => i !== idx);
+  user.activities = updatedActivities;
+  await user.save();
+  return res.json({ success: true, userId: user.id, balance: user.balance });
       }
     }
     res.status(404).json({ error: 'Deposit activity not found.' });
@@ -422,13 +424,13 @@ router.post('/admin/withdrawals/:activityId/approve', requireAdmin, async (req, 
       const activities = Array.isArray(user.activities) ? user.activities : [];
       const idx = activities.findIndex(a => a.id === activityId && a.type === 'withdrawal');
       if (idx !== -1) {
-        const amt = Number(activities[idx].amount || 0);
-        if (Number(user.balance) < amt) return res.status(400).json({ error: 'Insufficient balance.' });
-        user.balance = Number(user.balance) - amt;
-        activities[idx].status = 'approved';
-        user.activities = activities;
-        await user.save();
-        return res.json({ success: true, userId: user.id, balance: user.balance });
+  const amt = Number(activities[idx].amount || 0);
+  if (Number(user.balance) < amt) return res.status(400).json({ error: 'Insufficient balance.' });
+  user.balance = Number(user.balance) - amt;
+  const updatedActivities = activities.filter((_, i) => i !== idx);
+  user.activities = updatedActivities;
+  await user.save();
+  return res.json({ success: true, userId: user.id, balance: user.balance });
       }
     }
     res.status(404).json({ error: 'Withdrawal activity not found.' });
@@ -447,10 +449,11 @@ router.post('/admin/deposits/:activityId/reject', requireAdmin, async (req, res)
       const activities = Array.isArray(user.activities) ? user.activities : [];
       const idx = activities.findIndex(a => a.id === activityId && a.type === 'deposit');
       if (idx !== -1) {
-        activities[idx].status = 'rejected';
-        user.activities = activities;
-        await user.save();
-        return res.json({ success: true, userId: user.id });
+  // remove rejected deposit activity
+  const updatedActivities = activities.filter((_, i) => i !== idx);
+  user.activities = updatedActivities;
+  await user.save();
+  return res.json({ success: true, userId: user.id });
       }
     }
     res.status(404).json({ error: 'Deposit activity not found.' });
@@ -471,13 +474,13 @@ router.post('/admin/deposits/user/:userId/approve', requireAdmin, async (req, re
     // find latest deposit activity
     const found = activities.map((a, i) => ({ a, i })).reverse().find(x => x.a.type === 'deposit');
     if (!found) return res.status(404).json({ error: 'No deposit activity found for user.' });
-    const idx = found.i;
-    const amt = overrideAmount !== null ? overrideAmount : Number(activities[idx].amount || 0);
-    user.balance = Number(user.balance) + amt;
-    activities[idx].status = 'approved';
-    user.activities = activities;
-    await user.save();
-    return res.json({ success: true, userId: user.id, balance: user.balance });
+  const idx = found.i;
+  const amt = overrideAmount !== null ? overrideAmount : Number(activities[idx].amount || 0);
+  user.balance = Number(user.balance) + amt;
+  const updatedActivities = activities.filter((_, i) => i !== idx);
+  user.activities = updatedActivities;
+  await user.save();
+  return res.json({ success: true, userId: user.id, balance: user.balance });
   } catch (err) {
     console.error('Approve deposit by user error:', err);
     res.status(500).json({ error: 'Failed to approve deposit.' });
@@ -493,11 +496,11 @@ router.post('/admin/deposits/user/:userId/reject', requireAdmin, async (req, res
     const activities = Array.isArray(user.activities) ? user.activities : [];
     const found = activities.map((a, i) => ({ a, i })).reverse().find(x => x.a.type === 'deposit');
     if (!found) return res.status(404).json({ error: 'No deposit activity found for user.' });
-    const idx = found.i;
-    activities[idx].status = 'rejected';
-    user.activities = activities;
-    await user.save();
-    return res.json({ success: true, userId: user.id });
+  const idx = found.i;
+  const updatedActivities = activities.filter((_, i) => i !== idx);
+  user.activities = updatedActivities;
+  await user.save();
+  return res.json({ success: true, userId: user.id });
   } catch (err) {
     console.error('Reject deposit by user error:', err);
     res.status(500).json({ error: 'Failed to reject deposit.' });
@@ -535,10 +538,10 @@ router.post('/admin/withdrawals/:activityId/reject', requireAdmin, async (req, r
       const activities = Array.isArray(user.activities) ? user.activities : [];
       const idx = activities.findIndex(a => a.id === activityId && a.type === 'withdrawal');
       if (idx !== -1) {
-        activities[idx].status = 'rejected';
-        user.activities = activities;
-        await user.save();
-        return res.json({ success: true, userId: user.id });
+  const updatedActivities = activities.filter((_, i) => i !== idx);
+  user.activities = updatedActivities;
+  await user.save();
+  return res.json({ success: true, userId: user.id });
       }
     }
     res.status(404).json({ error: 'Withdrawal activity not found.' });
