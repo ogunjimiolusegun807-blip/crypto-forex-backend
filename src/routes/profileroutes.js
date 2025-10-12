@@ -24,6 +24,15 @@ const storage = new CloudinaryStorage({
 
 const multer = (await import('multer')).default;
 const upload = multer({ storage });
+// Separate storage for KYC documents so they live in their own folder
+const kycStorage = new CloudinaryStorage({
+  cloudinary,
+  params: {
+    folder: 'kyc_documents',
+    allowed_formats: ['jpg', 'jpeg', 'png', 'pdf']
+  }
+});
+const uploadKyc = multer({ storage: kycStorage });
 import { Plan, Signal } from '../models/index.js';
 
 // GET /api/user/profile - Get user profile
@@ -183,19 +192,45 @@ router.get('/signals', authenticateToken, async (req, res) => {
 
 // POST /api/user/kyc
 router.post('/kyc', authenticateToken, async (req, res) => {
-  const { kycData } = req.body;
-  if (!kycData) return res.status(400).json({ error: 'KYC data required.' });
-  try {
-    const user = await User.findByPk(req.userId);
-    if (!user) return res.status(404).json({ error: 'User not found.' });
-    user.kycStatus = 'pending';
-    user.activities = [...(user.activities || []), { type: 'kyc', kycData, date: new Date() }];
-    await user.save();
-    res.json({ kycStatus: user.kycStatus });
-  } catch (err) {
-    console.error('KYC error:', err);
-    res.status(500).json({ error: 'KYC submission failed.' });
-  }
+  // Accept multipart/form-data with files: identityDocument, addressDocument, selfiePhoto
+  uploadKyc.fields([
+    { name: 'identityDocument', maxCount: 1 },
+    { name: 'addressDocument', maxCount: 1 },
+    { name: 'selfiePhoto', maxCount: 1 }
+  ])(req, res, async function (err) {
+    if (err) {
+      console.error('KYC multer error:', err);
+      return res.status(500).json({ error: 'File upload failed.' });
+    }
+    try {
+      // form fields are in req.body
+      const data = { ...req.body };
+      // files (if uploaded) will be in req.files
+      const files = req.files || {};
+      const identityUrl = files.identityDocument && files.identityDocument[0] ? files.identityDocument[0].path : null;
+      const addressUrl = files.addressDocument && files.addressDocument[0] ? files.addressDocument[0].path : null;
+      const selfieUrl = files.selfiePhoto && files.selfiePhoto[0] ? files.selfiePhoto[0].path : null;
+
+      const kycData = {
+        ...data,
+        identityDocumentUrl: identityUrl,
+        addressDocumentUrl: addressUrl,
+        selfieUrl
+      };
+
+      const user = await User.findByPk(req.user.userId || req.userId);
+      if (!user) return res.status(404).json({ error: 'User not found.' });
+      user.kycStatus = 'pending';
+      if (!Array.isArray(user.activities)) user.activities = [];
+      const activity = { id: require('uuid').v4(), type: 'kyc', kycData, date: new Date(), status: 'pending' };
+      user.activities = [...user.activities, activity];
+      await user.save();
+      res.json(activity);
+    } catch (err) {
+      console.error('KYC error:', err);
+      res.status(500).json({ error: 'KYC submission failed.' });
+    }
+  });
 });
 
 // GET /api/user/kyc

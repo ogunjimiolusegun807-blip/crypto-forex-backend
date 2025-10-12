@@ -156,17 +156,25 @@ router.get('/admin/kyc', requireAdmin, async (req, res) => {
     if (!decoded || decoded.role !== 'admin') {
       return res.status(403).json({ error: 'Forbidden.' });
     }
-    // Find users with pending KYC
-    const pendingKYC = await User.findAll({ where: { kycStatus: 'pending' } });
-    // Return basic info for each user
-    const kycRequests = pendingKYC.map(user => ({
-      userId: user.id,
-      username: user.name,
-      email: user.email,
-      kycStatus: user.kycStatus,
-      createdAt: user.createdAt
-    }));
-    // Return the array directly for easier consumption by the frontend
+    // Aggregate KYC activities (so admins see the submitted kycData and file URLs)
+    const users = await User.findAll();
+    let kycRequests = [];
+    users.forEach(user => {
+      const activities = Array.isArray(user.activities) ? user.activities : [];
+      activities.forEach(activity => {
+        if (activity.type === 'kyc') {
+          kycRequests.push({
+            activityId: activity.id,
+            userId: user.id,
+            username: user.name,
+            email: user.email,
+            kycStatus: user.kycStatus,
+            createdAt: activity.date || user.createdAt,
+            kycData: activity.kycData || activity.data || {}
+          });
+        }
+      });
+    });
     res.json(kycRequests);
   } catch (err) {
     console.error('Admin get KYC error:', err);
