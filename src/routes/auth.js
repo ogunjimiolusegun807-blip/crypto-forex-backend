@@ -138,6 +138,30 @@ router.put('/admin/change-password', async (req, res) => {
 });
 
 export default router;
+// Admin: Get all KYC requests (pending)
+router.get('/admin/kyc', async (req, res) => {
+  try {
+    const adminToken = req.headers.authorization?.split(' ')[1];
+    const decoded = jwt.verify(adminToken, JWT_SECRET);
+    if (!decoded || decoded.role !== 'admin') {
+      return res.status(403).json({ error: 'Forbidden.' });
+    }
+    // Find users with pending KYC
+    const pendingKYC = await User.findAll({ where: { kycStatus: 'pending' } });
+    // Return basic info for each user
+    const kycRequests = pendingKYC.map(user => ({
+      userId: user.id,
+      username: user.name,
+      email: user.email,
+      kycStatus: user.kycStatus,
+      createdAt: user.createdAt
+    }));
+    res.json({ kycRequests });
+  } catch (err) {
+    console.error('Admin get KYC error:', err);
+    res.status(500).json({ error: 'Failed to fetch KYC requests.' });
+  }
+});
 // Admin: Get all deposit requests (aggregated from all users)
 router.get('/admin/deposits', async (req, res) => {
   try {
