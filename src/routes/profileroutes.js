@@ -40,10 +40,13 @@ router.get('/profile', authenticateToken, async (req, res) => {
   try {
     const user = await User.findByPk(req.userId);
     if (!user) return res.status(404).json({ error: 'User not found.' });
+    // Return balance and kycStatus so frontend can display up-to-date wallet info
     res.json({
       id: user.id,
       username: user.name,
-      email: user.email
+      email: user.email,
+      balance: Number(user.balance || 0),
+      kycStatus: user.kycStatus
     });
   } catch (err) {
     console.error('Profile error:', err);
