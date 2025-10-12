@@ -9,6 +9,8 @@ export function authenticateToken(req, res, next) {
   jwt.verify(token, JWT_SECRET, (err, decoded) => {
     if (err) return res.status(403).json({ error: 'Invalid token.' });
     req.user = decoded;
+    // backward-compat: set userId directly for routes that expect req.userId
+    if (decoded && decoded.userId) req.userId = decoded.userId;
     next();
   });
 }
