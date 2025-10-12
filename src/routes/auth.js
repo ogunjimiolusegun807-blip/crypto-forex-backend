@@ -339,6 +339,49 @@ router.post('/admin/kyc/:activityId/reject', requireAdmin, async (req, res) => {
   }
 });
 
+// Admin: Approve KYC by userId (fallback when activityId isn't present)
+router.post('/admin/kyc/user/:userId/approve', requireAdmin, async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const user = await User.findByPk(userId);
+    if (!user) return res.status(404).json({ error: 'User not found.' });
+    const activities = Array.isArray(user.activities) ? user.activities : [];
+    // find latest kyc activity
+    const idx = activities.map((a, i) => ({ a, i })).reverse().find(x => x.a.type === 'kyc');
+    if (!idx) return res.status(404).json({ error: 'No KYC activity found for user.' });
+    const activityIndex = idx.i;
+    user.kycStatus = 'verified';
+    activities[activityIndex].status = 'verified';
+    user.activities = activities;
+    await user.save();
+    return res.json({ success: true, userId: user.id });
+  } catch (err) {
+    console.error('Approve KYC by user error:', err);
+    res.status(500).json({ error: 'Failed to approve KYC.' });
+  }
+});
+
+// Admin: Reject KYC by userId (fallback when activityId isn't present)
+router.post('/admin/kyc/user/:userId/reject', requireAdmin, async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const user = await User.findByPk(userId);
+    if (!user) return res.status(404).json({ error: 'User not found.' });
+    const activities = Array.isArray(user.activities) ? user.activities : [];
+    const idx = activities.map((a, i) => ({ a, i })).reverse().find(x => x.a.type === 'kyc');
+    if (!idx) return res.status(404).json({ error: 'No KYC activity found for user.' });
+    const activityIndex = idx.i;
+    user.kycStatus = 'rejected';
+    activities[activityIndex].status = 'rejected';
+    user.activities = activities;
+    await user.save();
+    return res.json({ success: true, userId: user.id });
+  } catch (err) {
+    console.error('Reject KYC by user error:', err);
+    res.status(500).json({ error: 'Failed to reject KYC.' });
+  }
+});
+
 // Approve Deposit
 router.post('/admin/deposits/:activityId/approve', requireAdmin, async (req, res) => {
   try {
