@@ -204,21 +204,31 @@ router.get('/plans', authenticateToken, async (req, res) => {
 });
 
 // POST /api/user/signal/subscribe
+// Accepts { signalId, price? } — if a Signal row exists in DB we use its price; otherwise we accept a client-provided price fallback.
 router.post('/signal/subscribe', authenticateToken, async (req, res) => {
-  const { signalId } = req.body;
+  const { signalId, price: clientPrice } = req.body;
   if (!signalId) return res.status(400).json({ error: 'Signal ID required.' });
   try {
     const user = await User.findByPk(req.userId);
     if (!user) return res.status(404).json({ error: 'User not found.' });
-    // Fetch signal price
-    const signal = await Signal.findByPk(signalId);
-    if (!signal) return res.status(404).json({ error: 'Signal not found.' });
-    const price = Number(signal.price || 0);
-    if (price <= 0) return res.status(400).json({ error: 'Invalid signal price.' });
+
+    // Attempt to load canonical signal price from DB
+    let price = null;
+    const signal = await Signal.findByPk(signalId).catch(() => null);
+    if (signal) {
+      price = Number(signal.price || 0);
+    } else if (clientPrice) {
+      // Accept client-supplied price when DB entry missing
+      price = Number(clientPrice || 0);
+    }
+
+    if (!price || price <= 0) return res.status(404).json({ error: 'Signal not found.' });
+
     // Check balance
     if (Number(user.balance || 0) < price) {
       return res.status(400).json({ error: 'Insufficient balance.' });
     }
+
     // Debit and create activity
     user.balance = Number(user.balance || 0) - price;
     if (!Array.isArray(user.activities)) user.activities = [];
