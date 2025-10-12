@@ -456,6 +456,50 @@ router.post('/admin/deposits/:activityId/reject', requireAdmin, async (req, res)
   }
 });
 
+// Admin: Approve Deposit by userId (fallback when activityId isn't present)
+router.post('/admin/deposits/user/:userId/approve', requireAdmin, async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const overrideAmount = req.body && typeof req.body.amount !== 'undefined' ? Number(req.body.amount) : null;
+    const user = await User.findByPk(userId);
+    if (!user) return res.status(404).json({ error: 'User not found.' });
+    const activities = Array.isArray(user.activities) ? user.activities : [];
+    // find latest deposit activity
+    const found = activities.map((a, i) => ({ a, i })).reverse().find(x => x.a.type === 'deposit');
+    if (!found) return res.status(404).json({ error: 'No deposit activity found for user.' });
+    const idx = found.i;
+    const amt = overrideAmount !== null ? overrideAmount : Number(activities[idx].amount || 0);
+    user.balance = Number(user.balance) + amt;
+    activities[idx].status = 'approved';
+    user.activities = activities;
+    await user.save();
+    return res.json({ success: true, userId: user.id, balance: user.balance });
+  } catch (err) {
+    console.error('Approve deposit by user error:', err);
+    res.status(500).json({ error: 'Failed to approve deposit.' });
+  }
+});
+
+// Admin: Reject Deposit by userId (fallback when activityId isn't present)
+router.post('/admin/deposits/user/:userId/reject', requireAdmin, async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const user = await User.findByPk(userId);
+    if (!user) return res.status(404).json({ error: 'User not found.' });
+    const activities = Array.isArray(user.activities) ? user.activities : [];
+    const found = activities.map((a, i) => ({ a, i })).reverse().find(x => x.a.type === 'deposit');
+    if (!found) return res.status(404).json({ error: 'No deposit activity found for user.' });
+    const idx = found.i;
+    activities[idx].status = 'rejected';
+    user.activities = activities;
+    await user.save();
+    return res.json({ success: true, userId: user.id });
+  } catch (err) {
+    console.error('Reject deposit by user error:', err);
+    res.status(500).json({ error: 'Failed to reject deposit.' });
+  }
+});
+
 // Reject Withdrawal
 router.post('/admin/withdrawals/:activityId/reject', requireAdmin, async (req, res) => {
   try {
