@@ -386,13 +386,16 @@ router.post('/admin/kyc/user/:userId/reject', requireAdmin, async (req, res) => 
 router.post('/admin/deposits/:activityId/approve', requireAdmin, async (req, res) => {
   try {
     const { activityId } = req.params;
+    // Optional amount override can be provided in request body: { amount: 100 }
+    const overrideAmount = req.body && typeof req.body.amount !== 'undefined' ? Number(req.body.amount) : null;
     const users = await User.findAll();
     for (const user of users) {
       const activities = Array.isArray(user.activities) ? user.activities : [];
       const idx = activities.findIndex(a => a.id === activityId && a.type === 'deposit');
       if (idx !== -1) {
         // credit balance and mark activity approved
-        user.balance = Number(user.balance) + Number(activities[idx].amount || 0);
+        const amt = overrideAmount !== null ? overrideAmount : Number(activities[idx].amount || 0);
+        user.balance = Number(user.balance) + amt;
         activities[idx].status = 'approved';
         user.activities = activities;
         await user.save();
