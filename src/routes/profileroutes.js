@@ -207,15 +207,29 @@ router.post('/kyc', authenticateToken, async (req, res) => {
       const data = { ...req.body };
       // files (if uploaded) will be in req.files
       const files = req.files || {};
-      const identityUrl = files.identityDocument && files.identityDocument[0] ? files.identityDocument[0].path : null;
-      const addressUrl = files.addressDocument && files.addressDocument[0] ? files.addressDocument[0].path : null;
-      const selfieUrl = files.selfiePhoto && files.selfiePhoto[0] ? files.selfiePhoto[0].path : null;
+      // Helper to extract a usable URL from multer/cloudinary file object
+      const extractUrl = (fileObj) => {
+        if (!fileObj) return null;
+        // multer-storage-cloudinary stores 'path' and sometimes 'filename', cloudinary response may have 'secure_url' or 'url'
+        return fileObj.path || fileObj.secure_url || fileObj.url || fileObj.location || null;
+      };
+
+      const identityUrl = files.identityDocument && files.identityDocument[0] ? extractUrl(files.identityDocument[0]) : null;
+      const addressUrl = files.addressDocument && files.addressDocument[0] ? extractUrl(files.addressDocument[0]) : null;
+      const selfieUrl = files.selfiePhoto && files.selfiePhoto[0] ? extractUrl(files.selfiePhoto[0]) : null;
+
+      // Save raw file metadata for debugging/visibility as well as normalized urls
+      const filesMeta = {};
+      if (files.identityDocument && files.identityDocument[0]) filesMeta.identityDocument = files.identityDocument[0];
+      if (files.addressDocument && files.addressDocument[0]) filesMeta.addressDocument = files.addressDocument[0];
+      if (files.selfiePhoto && files.selfiePhoto[0]) filesMeta.selfiePhoto = files.selfiePhoto[0];
 
       const kycData = {
         ...data,
         identityDocumentUrl: identityUrl,
         addressDocumentUrl: addressUrl,
-        selfieUrl
+        selfieUrl,
+        files: filesMeta
       };
 
       const user = await User.findByPk(req.user.userId || req.userId);
