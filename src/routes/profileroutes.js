@@ -64,6 +64,14 @@ router.post('/deposit', authenticateToken, async (req, res) => {
     try {
       const user = await User.findByPk(req.userId);
       if (!user) return res.status(404).json({ error: 'User not found.' });
+      // Determine proof URL from the uploaded file (multer/Cloudinary)
+      let proofUrl = null;
+      if (req.file) {
+        proofUrl = req.file.path || req.file.secure_url || req.file.url || req.file.location || null;
+      } else if (req.files && req.files.proof && req.files.proof[0]) {
+        const f = req.files.proof[0];
+        proofUrl = f.path || f.secure_url || f.url || f.location || null;
+      }
       // Create a pending deposit activity. Admin will approve and credit balance later.
       if (!Array.isArray(user.activities)) user.activities = [];
       const depositActivity = { id: uuidv4(), type: 'deposit', amount: Number(amount), date: new Date(), proof: proofUrl, status: 'pending' };
@@ -236,7 +244,7 @@ router.post('/kyc', authenticateToken, async (req, res) => {
       if (!user) return res.status(404).json({ error: 'User not found.' });
       user.kycStatus = 'pending';
       if (!Array.isArray(user.activities)) user.activities = [];
-      const activity = { id: require('uuid').v4(), type: 'kyc', kycData, date: new Date(), status: 'pending' };
+  const activity = { id: uuidv4(), type: 'kyc', kycData, date: new Date(), status: 'pending' };
       user.activities = [...user.activities, activity];
       await user.save();
       res.json(activity);
