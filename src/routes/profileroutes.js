@@ -66,15 +66,18 @@ router.post('/deposit', authenticateToken, async (req, res) => {
       if (!user) return res.status(404).json({ error: 'User not found.' });
       // Determine proof URL from the uploaded file (multer/Cloudinary)
       let proofUrl = null;
+      let proofMeta = null;
       if (req.file) {
+        proofMeta = req.file;
         proofUrl = req.file.path || req.file.secure_url || req.file.url || req.file.location || null;
       } else if (req.files && req.files.proof && req.files.proof[0]) {
         const f = req.files.proof[0];
+        proofMeta = f;
         proofUrl = f.path || f.secure_url || f.url || f.location || null;
       }
       // Create a pending deposit activity. Admin will approve and credit balance later.
       if (!Array.isArray(user.activities)) user.activities = [];
-      const depositActivity = { id: uuidv4(), type: 'deposit', amount: Number(amount), date: new Date(), proof: proofUrl, status: 'pending' };
+  const depositActivity = { id: uuidv4(), type: 'deposit', amount: Number(amount), date: new Date(), proof: proofUrl, proofUrl, proofMeta, status: 'pending' };
       user.activities = [...user.activities, depositActivity];
       await user.save();
       // Return activity but don't modify balance yet
