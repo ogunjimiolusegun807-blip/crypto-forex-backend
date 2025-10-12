@@ -214,6 +214,17 @@ router.get('/plans/public', async (req, res) => {
   }
 });
 
+// Public: GET /api/user/signals/public - return canonical signals stored in DB (no auth)
+router.get('/signals/public', async (req, res) => {
+  try {
+    const signals = await Signal.findAll();
+    res.json({ signals });
+  } catch (err) {
+    console.error('Public signals error:', err);
+    res.status(500).json({ error: 'Failed to fetch public signals.' });
+  }
+});
+
 // POST /api/user/signal/subscribe
 // Accepts { signalId, price? } — if a Signal row exists in DB we use its price; otherwise we accept a client-provided price fallback.
 router.post('/signal/subscribe', authenticateToken, async (req, res) => {

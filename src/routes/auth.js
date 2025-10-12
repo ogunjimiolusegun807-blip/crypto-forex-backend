@@ -346,6 +346,67 @@ router.get('/admin/signals', requireAdmin, async (req, res) => {
   }
 });
 
+// Admin: Create a new signal
+router.post('/admin/signals', requireAdmin, async (req, res) => {
+  try {
+    const { name, price, description, features, accuracy, subscribers, badge, badgeColor, color } = req.body || {};
+    if (!name || !price || !description) return res.status(400).json({ error: 'name, price and description are required.' });
+    const signal = await Signal.create({
+      name,
+      price: Number(price),
+      description,
+      features: Array.isArray(features) ? features : (features ? String(features).split('\n').map(s => s.trim()).filter(Boolean) : []),
+      accuracy: accuracy || '',
+      subscribers: subscribers || '0',
+      badge: badge || '',
+      badgeColor: badgeColor || '',
+      color: color || '#000'
+    });
+    res.status(201).json(signal);
+  } catch (err) {
+    console.error('Admin create signal error:', err);
+    res.status(500).json({ error: 'Failed to create signal.' });
+  }
+});
+
+// Admin: Update an existing signal
+router.put('/admin/signals/:id', requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const signal = await Signal.findByPk(id);
+    if (!signal) return res.status(404).json({ error: 'Signal not found.' });
+    const { name, price, description, features, accuracy, subscribers, badge, badgeColor, color } = req.body || {};
+    signal.name = name ?? signal.name;
+    signal.price = price !== undefined ? Number(price) : signal.price;
+    signal.description = description ?? signal.description;
+    signal.features = Array.isArray(features) ? features : (features ? String(features).split('\n').map(s => s.trim()).filter(Boolean) : signal.features);
+    signal.accuracy = accuracy ?? signal.accuracy;
+    signal.subscribers = subscribers ?? signal.subscribers;
+    signal.badge = badge ?? signal.badge;
+    signal.badgeColor = badgeColor ?? signal.badgeColor;
+    signal.color = color ?? signal.color;
+    await signal.save();
+    res.json(signal);
+  } catch (err) {
+    console.error('Admin update signal error:', err);
+    res.status(500).json({ error: 'Failed to update signal.' });
+  }
+});
+
+// Admin: Delete a signal
+router.delete('/admin/signals/:id', requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const signal = await Signal.findByPk(id);
+    if (!signal) return res.status(404).json({ error: 'Signal not found.' });
+    await signal.destroy();
+    res.json({ success: true, id });
+  } catch (err) {
+    console.error('Admin delete signal error:', err);
+    res.status(500).json({ error: 'Failed to delete signal.' });
+  }
+});
+
 // Admin: Get all users (basic info)
 router.get('/admin/users', requireAdmin, async (req, res) => {
   try {
