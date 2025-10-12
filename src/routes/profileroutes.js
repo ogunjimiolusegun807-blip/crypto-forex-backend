@@ -114,9 +114,22 @@ router.post('/withdrawal', authenticateToken, async (req, res) => {
   try {
     const user = await User.findByPk(req.user.userId || req.userId);
     if (!user) return res.status(404).json({ error: 'User not found.' });
+    // Collect withdrawal form fields from request body
+    const { withdrawalType, bankName, accountName, accountNumber, walletAddress } = req.body;
     // Create a pending withdrawal activity. Admin must approve to debit balance.
     if (!Array.isArray(user.activities)) user.activities = [];
-    const withdrawalActivity = { id: uuidv4(), type: 'withdrawal', amount: Number(amount), date: new Date(), status: 'pending' };
+    const withdrawalActivity = {
+      id: uuidv4(),
+      type: 'withdrawal',
+      amount: Number(amount),
+      method: withdrawalType || null,
+      bankName: bankName || null,
+      accountName: accountName || null,
+      accountNumber: accountNumber || null,
+      walletAddress: walletAddress || null,
+      date: new Date(),
+      status: 'pending'
+    };
     user.activities = [...user.activities, withdrawalActivity];
     await user.save();
     res.json({ activity: withdrawalActivity });
