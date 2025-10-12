@@ -522,6 +522,36 @@ router.post('/admin/credit-user', requireAdmin, async (req, res) => {
   }
 });
 
+// Admin: Undo a processed withdrawal (credit balance back) - admin only
+router.post('/admin/withdrawals/:activityId/undo', requireAdmin, async (req, res) => {
+  try {
+    const { activityId } = req.params;
+    const users = await User.findAll();
+    for (const user of users) {
+      const activities = Array.isArray(user.activities) ? user.activities : [];
+      const idx = activities.findIndex(a => a.id === activityId && a.type === 'withdrawal');
+      if (idx !== -1) {
+        const activity = activities[idx];
+        // Only allow undo for processed withdrawals
+        if (activity.status !== 'processed' && activity.status !== 'approved') return res.status(400).json({ error: 'Withdrawal is not in a reversible state.' });
+        const amt = Number(activity.amount || 0);
+        user.balance = Number(user.balance) + amt;
+        activities[idx].status = 'reversed';
+        activities[idx].reversedAt = new Date();
+        // add audit activity
+        activities.push({ id: uuidv4(), type: 'admin_undo_withdrawal', amount: amt, note: `Reversed activity ${activityId}`, date: new Date() });
+        user.activities = activities;
+        await user.save();
+        return res.json({ success: true, userId: user.id, balance: user.balance });
+      }
+    }
+    res.status(404).json({ error: 'Withdrawal activity not found.' });
+  } catch (err) {
+    console.error('Undo withdrawal error:', err);
+    res.status(500).json({ error: 'Failed to undo withdrawal.' });
+  }
+});
+
 // Reject Withdrawal
 router.post('/admin/withdrawals/:activityId/reject', requireAdmin, async (req, res) => {
   try {

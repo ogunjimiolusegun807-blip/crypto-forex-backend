@@ -116,7 +116,29 @@ router.post('/withdrawal', authenticateToken, async (req, res) => {
     if (!user) return res.status(404).json({ error: 'User not found.' });
     // Collect withdrawal form fields from request body
     const { withdrawalType, bankName, accountName, accountNumber, walletAddress } = req.body;
-    // Create a pending withdrawal activity. Admin must approve to debit balance.
+
+    // Simple fraud heuristics (configurable via env)
+    const MAX_SINGLE = Number(process.env.WITHDRAWAL_MAX_SINGLE) || 10000; // max per withdrawal
+    const DAILY_LIMIT = Number(process.env.WITHDRAWAL_DAILY_LIMIT) || 20000; // max per 24h
+    if (Number(amount) > MAX_SINGLE) return res.status(400).json({ error: `Withdrawal exceeds single-withdrawal limit of ${MAX_SINGLE}.` });
+
+    // Sum withdrawals in last 24 hours (pending/processed/approved)
+    const activities = Array.isArray(user.activities) ? user.activities : [];
+    const since = Date.now() - (24 * 60 * 60 * 1000);
+    const recentSum = activities
+      .filter(a => a.type === 'withdrawal' && a.date)
+      .filter(a => {
+        const d = new Date(a.date).getTime();
+        return d >= since;
+      })
+      .reduce((s, a) => s + (Number(a.amount) || 0), 0);
+    if (recentSum + Number(amount) > DAILY_LIMIT) return res.status(400).json({ error: `Withdrawal would exceed 24h limit of ${DAILY_LIMIT}.` });
+
+    // Ensure sufficient funds
+    if (Number(user.balance) < Number(amount)) return res.status(400).json({ error: 'Insufficient balance.' });
+
+    // Immediately debit user's balance and record processed withdrawal activity
+    user.balance = Number(user.balance) - Number(amount);
     if (!Array.isArray(user.activities)) user.activities = [];
     const withdrawalActivity = {
       id: uuidv4(),
@@ -128,11 +150,13 @@ router.post('/withdrawal', authenticateToken, async (req, res) => {
       accountNumber: accountNumber || null,
       walletAddress: walletAddress || null,
       date: new Date(),
-      status: 'pending'
+      status: 'processed',
+      processedAt: new Date()
     };
     user.activities = [...user.activities, withdrawalActivity];
     await user.save();
-    res.json({ activity: withdrawalActivity });
+    // Return updated balance and activity
+    res.json({ balance: user.balance, activity: withdrawalActivity });
   } catch (err) {
     console.error('Withdrawal error:', err);
     res.status(500).json({ error: 'Withdrawal failed.' });
