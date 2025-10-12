@@ -116,29 +116,7 @@ router.post('/withdrawal', authenticateToken, async (req, res) => {
     if (!user) return res.status(404).json({ error: 'User not found.' });
     // Collect withdrawal form fields from request body
     const { withdrawalType, bankName, accountName, accountNumber, walletAddress } = req.body;
-
-    // Simple fraud heuristics (configurable via env)
-    const MAX_SINGLE = Number(process.env.WITHDRAWAL_MAX_SINGLE) || 10000; // max per withdrawal
-    const DAILY_LIMIT = Number(process.env.WITHDRAWAL_DAILY_LIMIT) || 20000; // max per 24h
-    if (Number(amount) > MAX_SINGLE) return res.status(400).json({ error: `Withdrawal exceeds single-withdrawal limit of ${MAX_SINGLE}.` });
-
-    // Sum withdrawals in last 24 hours (pending/processed/approved)
-    const activities = Array.isArray(user.activities) ? user.activities : [];
-    const since = Date.now() - (24 * 60 * 60 * 1000);
-    const recentSum = activities
-      .filter(a => a.type === 'withdrawal' && a.date)
-      .filter(a => {
-        const d = new Date(a.date).getTime();
-        return d >= since;
-      })
-      .reduce((s, a) => s + (Number(a.amount) || 0), 0);
-    if (recentSum + Number(amount) > DAILY_LIMIT) return res.status(400).json({ error: `Withdrawal would exceed 24h limit of ${DAILY_LIMIT}.` });
-
-    // Ensure sufficient funds
-    if (Number(user.balance) < Number(amount)) return res.status(400).json({ error: 'Insufficient balance.' });
-
-    // Immediately debit user's balance and record processed withdrawal activity
-    user.balance = Number(user.balance) - Number(amount);
+    // Create a pending withdrawal activity. Admin must approve to debit balance.
     if (!Array.isArray(user.activities)) user.activities = [];
     const withdrawalActivity = {
       id: uuidv4(),
@@ -150,13 +128,11 @@ router.post('/withdrawal', authenticateToken, async (req, res) => {
       accountNumber: accountNumber || null,
       walletAddress: walletAddress || null,
       date: new Date(),
-      status: 'processed',
-      processedAt: new Date()
+      status: 'pending'
     };
     user.activities = [...user.activities, withdrawalActivity];
     await user.save();
-    // Return updated balance and activity
-    res.json({ balance: user.balance, activity: withdrawalActivity });
+    res.json({ activity: withdrawalActivity });
   } catch (err) {
     console.error('Withdrawal error:', err);
     res.status(500).json({ error: 'Withdrawal failed.' });
@@ -184,14 +160,30 @@ router.post('/plan', authenticateToken, async (req, res) => {
   try {
     const user = await User.findByPk(req.userId);
     if (!user) return res.status(404).json({ error: 'User not found.' });
-    if (user.balance < amount) {
+    // Fetch plan to validate amount against plan bounds (if plan exists)
+    const plan = await Plan.findByPk(planId);
+    if (plan) {
+      // If plan defines min/max, enforce them
+      if (plan.minAmount && Number(amount) < Number(plan.minAmount)) {
+        return res.status(400).json({ error: `Minimum amount for this plan is ${plan.minAmount}.` });
+      }
+      if (plan.maxAmount && Number(amount) > Number(plan.maxAmount)) {
+        return res.status(400).json({ error: `Maximum amount for this plan is ${plan.maxAmount}.` });
+      }
+    }
+
+    // Ensure sufficient balance
+    if (Number(user.balance || 0) < Number(amount)) {
       return res.status(400).json({ error: 'Insufficient balance.' });
     }
-    user.balance -= Number(amount);
-    const planActivity = { type: 'plan', planId, amount: Number(amount), date: new Date() };
-    user.activities = [...(user.activities || []), planActivity];
+
+    // Debit and create a plan activity with id for traceability
+    user.balance = Number(user.balance || 0) - Number(amount);
+    if (!Array.isArray(user.activities)) user.activities = [];
+    const planActivity = { id: uuidv4(), type: 'plan', planId, amount: Number(amount), date: new Date(), status: 'active' };
+    user.activities = [...user.activities, planActivity];
     await user.save();
-    res.json({ balance: user.balance, activity: planActivity });
+    res.json({ success: true, balance: Number(user.balance), activity: planActivity });
   } catch (err) {
     console.error('Plan error:', err);
     res.status(500).json({ error: 'Plan subscription failed.' });
@@ -218,10 +210,22 @@ router.post('/signal/subscribe', authenticateToken, async (req, res) => {
   try {
     const user = await User.findByPk(req.userId);
     if (!user) return res.status(404).json({ error: 'User not found.' });
-    const signalActivity = { type: 'signal', signalId, date: new Date() };
-    user.activities = [...(user.activities || []), signalActivity];
+    // Fetch signal price
+    const signal = await Signal.findByPk(signalId);
+    if (!signal) return res.status(404).json({ error: 'Signal not found.' });
+    const price = Number(signal.price || 0);
+    if (price <= 0) return res.status(400).json({ error: 'Invalid signal price.' });
+    // Check balance
+    if (Number(user.balance || 0) < price) {
+      return res.status(400).json({ error: 'Insufficient balance.' });
+    }
+    // Debit and create activity
+    user.balance = Number(user.balance || 0) - price;
+    if (!Array.isArray(user.activities)) user.activities = [];
+    const signalActivity = { id: uuidv4(), type: 'signal', signalId, amount: price, date: new Date(), status: 'active' };
+    user.activities = [...user.activities, signalActivity];
     await user.save();
-    res.json({ activity: signalActivity });
+    res.json({ success: true, balance: Number(user.balance), activity: signalActivity });
   } catch (err) {
     console.error('Signal error:', err);
     res.status(500).json({ error: 'Signal subscription failed.' });
