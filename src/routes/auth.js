@@ -500,6 +500,28 @@ router.post('/admin/deposits/user/:userId/reject', requireAdmin, async (req, res
   }
 });
 
+// Admin: Manual credit to a user (any registered user)
+router.post('/admin/credit-user', requireAdmin, async (req, res) => {
+  try {
+    const { userId, amount, note } = req.body || {};
+    if (!userId) return res.status(400).json({ error: 'userId required.' });
+    const amt = Number(amount);
+    if (!amt || amt <= 0) return res.status(400).json({ error: 'Valid amount required.' });
+    const user = await User.findByPk(userId);
+    if (!user) return res.status(404).json({ error: 'User not found.' });
+    // Create a manual credit activity and update balance
+    if (!Array.isArray(user.activities)) user.activities = [];
+    const activity = { id: uuidv4(), type: 'manual_credit', amount: amt, note: note || null, date: new Date(), status: 'approved' };
+    user.activities = [...user.activities, activity];
+    user.balance = Number(user.balance || 0) + amt;
+    await user.save();
+    return res.json({ success: true, userId: user.id, balance: user.balance, activity });
+  } catch (err) {
+    console.error('Admin manual credit error:', err);
+    res.status(500).json({ error: 'Failed to credit user.' });
+  }
+});
+
 // Reject Withdrawal
 router.post('/admin/withdrawals/:activityId/reject', requireAdmin, async (req, res) => {
   try {
