@@ -289,7 +289,8 @@ router.get('/admin/signals', requireAdmin, async (req, res) => {
 router.get('/admin/users', requireAdmin, async (req, res) => {
   try {
     const users = await User.findAll();
-    const basic = users.map(u => ({ id: u.id, username: u.name, email: u.email, createdAt: u.createdAt }));
+    // Include balance so admin UI can display real user balances
+    const basic = users.map(u => ({ id: u.id, username: u.name, email: u.email, createdAt: u.createdAt, balance: typeof u.balance !== 'undefined' ? Number(u.balance) : 0 }));
     res.json(basic);
   } catch (err) {
     console.error('Admin get users error:', err);
