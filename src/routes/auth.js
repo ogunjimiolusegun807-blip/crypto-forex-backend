@@ -138,3 +138,64 @@ router.put('/admin/change-password', async (req, res) => {
 });
 
 export default router;
+// Admin: Get all deposit requests (aggregated from all users)
+router.get('/admin/deposits', async (req, res) => {
+  try {
+    const adminToken = req.headers.authorization?.split(' ')[1];
+    const decoded = jwt.verify(adminToken, JWT_SECRET);
+    if (!decoded || decoded.role !== 'admin') {
+      return res.status(403).json({ error: 'Forbidden.' });
+    }
+    // Aggregate all deposit activities from all users
+    const users = await User.findAll();
+    let deposits = [];
+    users.forEach(user => {
+      const activities = Array.isArray(user.activities) ? user.activities : [];
+      activities.forEach(activity => {
+        if (activity.type === 'deposit') {
+          deposits.push({
+            ...activity,
+            userId: user.id,
+            username: user.name,
+            email: user.email
+          });
+        }
+      });
+    });
+    res.json({ deposits });
+  } catch (err) {
+    console.error('Admin get deposits error:', err);
+    res.status(500).json({ error: 'Failed to fetch deposits.' });
+  }
+});
+
+// Admin: Get all withdrawal requests (aggregated from all users)
+router.get('/admin/withdrawals', async (req, res) => {
+  try {
+    const adminToken = req.headers.authorization?.split(' ')[1];
+    const decoded = jwt.verify(adminToken, JWT_SECRET);
+    if (!decoded || decoded.role !== 'admin') {
+      return res.status(403).json({ error: 'Forbidden.' });
+    }
+    // Aggregate all withdrawal activities from all users
+    const users = await User.findAll();
+    let withdrawals = [];
+    users.forEach(user => {
+      const activities = Array.isArray(user.activities) ? user.activities : [];
+      activities.forEach(activity => {
+        if (activity.type === 'withdrawal') {
+          withdrawals.push({
+            ...activity,
+            userId: user.id,
+            username: user.name,
+            email: user.email
+          });
+        }
+      });
+    });
+    res.json({ withdrawals });
+  } catch (err) {
+    console.error('Admin get withdrawals error:', err);
+    res.status(500).json({ error: 'Failed to fetch withdrawals.' });
+  }
+});
