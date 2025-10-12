@@ -156,13 +156,15 @@ router.get('/admin/kyc', requireAdmin, async (req, res) => {
     if (!decoded || decoded.role !== 'admin') {
       return res.status(403).json({ error: 'Forbidden.' });
     }
-    // Aggregate KYC activities (so admins see the submitted kycData and file URLs)
+    // Aggregate KYC activities (only include pending/unhandled requests)
     const users = await User.findAll();
     let kycRequests = [];
     users.forEach(user => {
       const activities = Array.isArray(user.activities) ? user.activities : [];
       activities.forEach(activity => {
-        if (activity.type === 'kyc') {
+        // treat missing status as 'pending'
+        const status = typeof activity.status === 'undefined' ? 'pending' : activity.status;
+        if (activity.type === 'kyc' && status === 'pending') {
           kycRequests.push({
             activityId: activity.id,
             userId: user.id,
@@ -196,13 +198,14 @@ router.get('/admin/deposits', requireAdmin, async (req, res) => {
     if (!decoded || decoded.role !== 'admin') {
       return res.status(403).json({ error: 'Forbidden.' });
     }
-    // Aggregate all deposit activities from all users
+    // Aggregate all deposit activities from all users (only pending)
     const users = await User.findAll();
     let deposits = [];
     users.forEach(user => {
       const activities = Array.isArray(user.activities) ? user.activities : [];
       activities.forEach(activity => {
-        if (activity.type === 'deposit') {
+        const status = typeof activity.status === 'undefined' ? 'pending' : activity.status;
+        if (activity.type === 'deposit' && status === 'pending') {
           deposits.push({
             ...activity,
             userId: user.id,
@@ -235,13 +238,14 @@ router.get('/admin/withdrawals', requireAdmin, async (req, res) => {
     if (!decoded || decoded.role !== 'admin') {
       return res.status(403).json({ error: 'Forbidden.' });
     }
-    // Aggregate all withdrawal activities from all users
+    // Aggregate all withdrawal activities from all users (only pending)
     const users = await User.findAll();
     let withdrawals = [];
     users.forEach(user => {
       const activities = Array.isArray(user.activities) ? user.activities : [];
       activities.forEach(activity => {
-        if (activity.type === 'withdrawal') {
+        const status = typeof activity.status === 'undefined' ? 'pending' : activity.status;
+        if (activity.type === 'withdrawal' && status === 'pending') {
           withdrawals.push({
             ...activity,
             userId: user.id,
