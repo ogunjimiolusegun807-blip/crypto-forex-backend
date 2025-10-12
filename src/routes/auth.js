@@ -274,6 +274,67 @@ router.get('/admin/plans', requireAdmin, async (req, res) => {
   }
 });
 
+// Admin: Create a new plan
+router.post('/admin/plans', requireAdmin, async (req, res) => {
+  try {
+    const { name, type, roi, minAmount, maxAmount, duration, color, gradient, features } = req.body || {};
+    if (!name || !type || !roi) return res.status(400).json({ error: 'name, type and roi are required.' });
+    const plan = await Plan.create({
+      name,
+      type,
+      roi: String(roi),
+      minAmount: Number(minAmount) || 0,
+      maxAmount: Number(maxAmount) || 0,
+      duration: duration || '',
+      color: color || '#000',
+      gradient: gradient || '',
+      features: Array.isArray(features) ? features : (features ? String(features).split('\n').map(s => s.trim()).filter(Boolean) : [])
+    });
+    res.status(201).json(plan);
+  } catch (err) {
+    console.error('Admin create plan error:', err);
+    res.status(500).json({ error: 'Failed to create plan.' });
+  }
+});
+
+// Admin: Update an existing plan
+router.put('/admin/plans/:id', requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const plan = await Plan.findByPk(id);
+    if (!plan) return res.status(404).json({ error: 'Plan not found.' });
+    const { name, type, roi, minAmount, maxAmount, duration, color, gradient, features } = req.body || {};
+    plan.name = name ?? plan.name;
+    plan.type = type ?? plan.type;
+    plan.roi = roi !== undefined ? String(roi) : plan.roi;
+    plan.minAmount = minAmount !== undefined ? Number(minAmount) : plan.minAmount;
+    plan.maxAmount = maxAmount !== undefined ? Number(maxAmount) : plan.maxAmount;
+    plan.duration = duration ?? plan.duration;
+    plan.color = color ?? plan.color;
+    plan.gradient = gradient ?? plan.gradient;
+    plan.features = Array.isArray(features) ? features : (features ? String(features).split('\n').map(s => s.trim()).filter(Boolean) : plan.features);
+    await plan.save();
+    res.json(plan);
+  } catch (err) {
+    console.error('Admin update plan error:', err);
+    res.status(500).json({ error: 'Failed to update plan.' });
+  }
+});
+
+// Admin: Delete a plan
+router.delete('/admin/plans/:id', requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const plan = await Plan.findByPk(id);
+    if (!plan) return res.status(404).json({ error: 'Plan not found.' });
+    await plan.destroy();
+    res.json({ success: true, id });
+  } catch (err) {
+    console.error('Admin delete plan error:', err);
+    res.status(500).json({ error: 'Failed to delete plan.' });
+  }
+});
+
 // Admin: Get all signals
 router.get('/admin/signals', requireAdmin, async (req, res) => {
   try {
