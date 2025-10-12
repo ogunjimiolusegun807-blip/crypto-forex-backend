@@ -3,6 +3,8 @@ import { v2 as cloudinary } from 'cloudinary';
 import { CloudinaryStorage } from 'multer-storage-cloudinary';
 import jwt from 'jsonwebtoken';
 import User from '../models/User.js';
+import { v4 as uuidv4 } from 'uuid';
+import { authenticateToken } from '../middleware/auth.js';
 
 const router = express.Router();
 // Cloudinary config (use environment variables for credentials)
@@ -22,20 +24,7 @@ const storage = new CloudinaryStorage({
 
 const multer = (await import('multer')).default;
 const upload = multer({ storage });
-const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret';
-
-// Middleware to verify JWT and attach user to request
 import { Plan, Signal } from '../models/index.js';
-function authenticateToken(req, res, next) {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
-  if (!token) return res.status(401).json({ error: 'No token provided.' });
-  jwt.verify(token, JWT_SECRET, (err, decoded) => {
-    if (err) return res.status(403).json({ error: 'Invalid token.' });
-    req.userId = decoded.userId;
-    next();
-  });
-}
 
 // GET /api/user/profile - Get user profile
 router.get('/profile', authenticateToken, async (req, res) => {
@@ -66,19 +55,14 @@ router.post('/deposit', authenticateToken, async (req, res) => {
     try {
       const user = await User.findByPk(req.userId);
       if (!user) return res.status(404).json({ error: 'User not found.' });
-      user.balance += Number(amount);
-      let proofUrl = null;
-      if (req.file && req.file.path) {
-        proofUrl = req.file.path; // Cloudinary URL
-      }
-      // Ensure activities is always an array
-      if (!Array.isArray(user.activities)) {
-        user.activities = [];
-      }
-      const depositActivity = { type: 'deposit', amount: Number(amount), date: new Date(), proof: proofUrl };
+      // Create a pending deposit activity. Admin will approve and credit balance later.
+      if (!Array.isArray(user.activities)) user.activities = [];
+      const depositActivity = { id: uuidv4(), type: 'deposit', amount: Number(amount), date: new Date(), proof: proofUrl, status: 'pending' };
       user.activities = [...user.activities, depositActivity];
       await user.save();
-      res.json({ balance: user.balance, activity: depositActivity });
+      // Return activity but don't modify balance yet
+      res.json({ activity: depositActivity });
+      
     } catch (err) {
       console.error('Deposit error:', err);
       res.status(500).json({ error: 'Deposit failed.' });
@@ -93,7 +77,7 @@ router.get('/deposits', authenticateToken, async (req, res) => {
     if (!user) return res.status(404).json({ error: 'User not found.' });
   const activities = Array.isArray(user.activities) ? user.activities : [];
   const deposits = activities.filter(a => a.type === 'deposit');
-    res.json({ deposits });
+    res.json(deposits);
   } catch (err) {
     console.error('Deposits error:', err);
     res.status(500).json({ error: 'Failed to fetch deposits.' });
@@ -105,14 +89,14 @@ router.post('/withdrawal', authenticateToken, async (req, res) => {
   const { amount } = req.body;
   if (!amount || amount <= 0) return res.status(400).json({ error: 'Invalid amount.' });
   try {
-    const user = await User.findByPk(req.userId);
+    const user = await User.findByPk(req.user.userId || req.userId);
     if (!user) return res.status(404).json({ error: 'User not found.' });
-    if (user.balance < amount) return res.status(400).json({ error: 'Insufficient balance.' });
-    user.balance -= amount;
-    const withdrawalActivity = { type: 'withdrawal', amount, date: new Date() };
-    user.activities = [...(user.activities || []), withdrawalActivity];
+    // Create a pending withdrawal activity. Admin must approve to debit balance.
+    if (!Array.isArray(user.activities)) user.activities = [];
+    const withdrawalActivity = { id: uuidv4(), type: 'withdrawal', amount: Number(amount), date: new Date(), status: 'pending' };
+    user.activities = [...user.activities, withdrawalActivity];
     await user.save();
-    res.json({ balance: user.balance, activity: withdrawalActivity });
+    res.json({ activity: withdrawalActivity });
   } catch (err) {
     console.error('Withdrawal error:', err);
     res.status(500).json({ error: 'Withdrawal failed.' });
@@ -122,10 +106,10 @@ router.post('/withdrawal', authenticateToken, async (req, res) => {
 // GET /api/user/withdrawals
 router.get('/withdrawals', authenticateToken, async (req, res) => {
   try {
-    const user = await User.findByPk(req.userId);
+    const user = await User.findByPk(req.user.userId || req.userId);
     if (!user) return res.status(404).json({ error: 'User not found.' });
     const withdrawals = (user.activities || []).filter(a => a.type === 'withdrawal');
-    res.json({ withdrawals });
+    res.json(withdrawals);
   } catch (err) {
     console.error('Withdrawals error:', err);
     res.status(500).json({ error: 'Failed to fetch withdrawals.' });

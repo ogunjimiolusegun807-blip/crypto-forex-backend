@@ -2,6 +2,9 @@ import express from 'express';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import User from '../models/User.js';
+import { Plan, Signal } from '../models/index.js';
+import { requireAdmin } from '../middleware/auth.js';
+import { v4 as uuidv4 } from 'uuid';
 const router = express.Router();
 const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret';
 
@@ -139,10 +142,17 @@ router.put('/admin/change-password', async (req, res) => {
 
 export default router;
 // Admin: Get all KYC requests (pending)
-router.get('/admin/kyc', async (req, res) => {
+router.get('/admin/kyc', requireAdmin, async (req, res) => {
   try {
-    const adminToken = req.headers.authorization?.split(' ')[1];
-    const decoded = jwt.verify(adminToken, JWT_SECRET);
+    const authHeader = req.headers.authorization;
+    if (!authHeader) return res.status(401).json({ error: 'Authorization header missing.' });
+    const adminToken = authHeader.split(' ')[1];
+    let decoded;
+    try {
+      decoded = jwt.verify(adminToken, JWT_SECRET);
+    } catch (e) {
+      return res.status(401).json({ error: 'Invalid token.' });
+    }
     if (!decoded || decoded.role !== 'admin') {
       return res.status(403).json({ error: 'Forbidden.' });
     }
@@ -156,17 +166,25 @@ router.get('/admin/kyc', async (req, res) => {
       kycStatus: user.kycStatus,
       createdAt: user.createdAt
     }));
-    res.json({ kycRequests });
+    // Return the array directly for easier consumption by the frontend
+    res.json(kycRequests);
   } catch (err) {
     console.error('Admin get KYC error:', err);
     res.status(500).json({ error: 'Failed to fetch KYC requests.' });
   }
 });
 // Admin: Get all deposit requests (aggregated from all users)
-router.get('/admin/deposits', async (req, res) => {
+router.get('/admin/deposits', requireAdmin, async (req, res) => {
   try {
-    const adminToken = req.headers.authorization?.split(' ')[1];
-    const decoded = jwt.verify(adminToken, JWT_SECRET);
+    const authHeader = req.headers.authorization;
+    if (!authHeader) return res.status(401).json({ error: 'Authorization header missing.' });
+    const adminToken = authHeader.split(' ')[1];
+    let decoded;
+    try {
+      decoded = jwt.verify(adminToken, JWT_SECRET);
+    } catch (e) {
+      return res.status(401).json({ error: 'Invalid token.' });
+    }
     if (!decoded || decoded.role !== 'admin') {
       return res.status(403).json({ error: 'Forbidden.' });
     }
@@ -186,7 +204,8 @@ router.get('/admin/deposits', async (req, res) => {
         }
       });
     });
-    res.json({ deposits });
+    // Return the array directly
+    res.json(deposits);
   } catch (err) {
     console.error('Admin get deposits error:', err);
     res.status(500).json({ error: 'Failed to fetch deposits.' });
@@ -194,10 +213,17 @@ router.get('/admin/deposits', async (req, res) => {
 });
 
 // Admin: Get all withdrawal requests (aggregated from all users)
-router.get('/admin/withdrawals', async (req, res) => {
+router.get('/admin/withdrawals', requireAdmin, async (req, res) => {
   try {
-    const adminToken = req.headers.authorization?.split(' ')[1];
-    const decoded = jwt.verify(adminToken, JWT_SECRET);
+    const authHeader = req.headers.authorization;
+    if (!authHeader) return res.status(401).json({ error: 'Authorization header missing.' });
+    const adminToken = authHeader.split(' ')[1];
+    let decoded;
+    try {
+      decoded = jwt.verify(adminToken, JWT_SECRET);
+    } catch (e) {
+      return res.status(401).json({ error: 'Invalid token.' });
+    }
     if (!decoded || decoded.role !== 'admin') {
       return res.status(403).json({ error: 'Forbidden.' });
     }
@@ -217,9 +243,183 @@ router.get('/admin/withdrawals', async (req, res) => {
         }
       });
     });
-    res.json({ withdrawals });
+    // Return the array directly
+    res.json(withdrawals);
   } catch (err) {
     console.error('Admin get withdrawals error:', err);
     res.status(500).json({ error: 'Failed to fetch withdrawals.' });
+  }
+});
+
+// Admin: Get all plans
+router.get('/admin/plans', requireAdmin, async (req, res) => {
+  try {
+    const plans = await Plan.findAll();
+    res.json(plans);
+  } catch (err) {
+    console.error('Admin get plans error:', err);
+    res.status(500).json({ error: 'Failed to fetch plans.' });
+  }
+});
+
+// Admin: Get all signals
+router.get('/admin/signals', requireAdmin, async (req, res) => {
+  try {
+    const signals = await Signal.findAll();
+    res.json(signals);
+  } catch (err) {
+    console.error('Admin get signals error:', err);
+    res.status(500).json({ error: 'Failed to fetch signals.' });
+  }
+});
+
+// Admin: Get all users (basic info)
+router.get('/admin/users', requireAdmin, async (req, res) => {
+  try {
+    const users = await User.findAll();
+    const basic = users.map(u => ({ id: u.id, username: u.name, email: u.email, createdAt: u.createdAt }));
+    res.json(basic);
+  } catch (err) {
+    console.error('Admin get users error:', err);
+    res.status(500).json({ error: 'Failed to fetch users.' });
+  }
+});
+
+// Approve KYC
+router.post('/admin/kyc/:activityId/approve', requireAdmin, async (req, res) => {
+  try {
+    const { activityId } = req.params;
+    const users = await User.findAll();
+    for (const user of users) {
+      const activities = Array.isArray(user.activities) ? user.activities : [];
+      const idx = activities.findIndex(a => a.id === activityId && a.type === 'kyc');
+      if (idx !== -1) {
+        user.kycStatus = 'verified';
+        activities[idx].status = 'verified';
+        user.activities = activities;
+        await user.save();
+        return res.json({ success: true, userId: user.id });
+      }
+    }
+    res.status(404).json({ error: 'KYC activity not found.' });
+  } catch (err) {
+    console.error('Approve KYC error:', err);
+    res.status(500).json({ error: 'Failed to approve KYC.' });
+  }
+});
+
+// Reject KYC
+router.post('/admin/kyc/:activityId/reject', requireAdmin, async (req, res) => {
+  try {
+    const { activityId } = req.params;
+    const users = await User.findAll();
+    for (const user of users) {
+      const activities = Array.isArray(user.activities) ? user.activities : [];
+      const idx = activities.findIndex(a => a.id === activityId && a.type === 'kyc');
+      if (idx !== -1) {
+        user.kycStatus = 'rejected';
+        activities[idx].status = 'rejected';
+        user.activities = activities;
+        await user.save();
+        return res.json({ success: true, userId: user.id });
+      }
+    }
+    res.status(404).json({ error: 'KYC activity not found.' });
+  } catch (err) {
+    console.error('Reject KYC error:', err);
+    res.status(500).json({ error: 'Failed to reject KYC.' });
+  }
+});
+
+// Approve Deposit
+router.post('/admin/deposits/:activityId/approve', requireAdmin, async (req, res) => {
+  try {
+    const { activityId } = req.params;
+    const users = await User.findAll();
+    for (const user of users) {
+      const activities = Array.isArray(user.activities) ? user.activities : [];
+      const idx = activities.findIndex(a => a.id === activityId && a.type === 'deposit');
+      if (idx !== -1) {
+        // credit balance and mark activity approved
+        user.balance = Number(user.balance) + Number(activities[idx].amount || 0);
+        activities[idx].status = 'approved';
+        user.activities = activities;
+        await user.save();
+        return res.json({ success: true, userId: user.id, balance: user.balance });
+      }
+    }
+    res.status(404).json({ error: 'Deposit activity not found.' });
+  } catch (err) {
+    console.error('Approve deposit error:', err);
+    res.status(500).json({ error: 'Failed to approve deposit.' });
+  }
+});
+
+// Approve Withdrawal
+router.post('/admin/withdrawals/:activityId/approve', requireAdmin, async (req, res) => {
+  try {
+    const { activityId } = req.params;
+    const users = await User.findAll();
+    for (const user of users) {
+      const activities = Array.isArray(user.activities) ? user.activities : [];
+      const idx = activities.findIndex(a => a.id === activityId && a.type === 'withdrawal');
+      if (idx !== -1) {
+        const amt = Number(activities[idx].amount || 0);
+        if (Number(user.balance) < amt) return res.status(400).json({ error: 'Insufficient balance.' });
+        user.balance = Number(user.balance) - amt;
+        activities[idx].status = 'approved';
+        user.activities = activities;
+        await user.save();
+        return res.json({ success: true, userId: user.id, balance: user.balance });
+      }
+    }
+    res.status(404).json({ error: 'Withdrawal activity not found.' });
+  } catch (err) {
+    console.error('Approve withdrawal error:', err);
+    res.status(500).json({ error: 'Failed to approve withdrawal.' });
+  }
+});
+
+// Reject Deposit
+router.post('/admin/deposits/:activityId/reject', requireAdmin, async (req, res) => {
+  try {
+    const { activityId } = req.params;
+    const users = await User.findAll();
+    for (const user of users) {
+      const activities = Array.isArray(user.activities) ? user.activities : [];
+      const idx = activities.findIndex(a => a.id === activityId && a.type === 'deposit');
+      if (idx !== -1) {
+        activities[idx].status = 'rejected';
+        user.activities = activities;
+        await user.save();
+        return res.json({ success: true, userId: user.id });
+      }
+    }
+    res.status(404).json({ error: 'Deposit activity not found.' });
+  } catch (err) {
+    console.error('Reject deposit error:', err);
+    res.status(500).json({ error: 'Failed to reject deposit.' });
+  }
+});
+
+// Reject Withdrawal
+router.post('/admin/withdrawals/:activityId/reject', requireAdmin, async (req, res) => {
+  try {
+    const { activityId } = req.params;
+    const users = await User.findAll();
+    for (const user of users) {
+      const activities = Array.isArray(user.activities) ? user.activities : [];
+      const idx = activities.findIndex(a => a.id === activityId && a.type === 'withdrawal');
+      if (idx !== -1) {
+        activities[idx].status = 'rejected';
+        user.activities = activities;
+        await user.save();
+        return res.json({ success: true, userId: user.id });
+      }
+    }
+    res.status(404).json({ error: 'Withdrawal activity not found.' });
+  } catch (err) {
+    console.error('Reject withdrawal error:', err);
+    res.status(500).json({ error: 'Failed to reject withdrawal.' });
   }
 });

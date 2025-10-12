@@ -41,6 +41,9 @@ app.use((req, res, next) => {
 
 app.use('/api/auth', authRoutes);
 app.use('/api/user', profileRoutes);
+// Also mount auth routes at /api so admin routes defined as '/admin/..' inside the auth router
+// are reachable under /api/admin/.. which the frontend expects.
+app.use('/api', authRoutes);
 
 app.get('/', (req, res) => {
   res.send('Crypto Forex Backend API is running');
