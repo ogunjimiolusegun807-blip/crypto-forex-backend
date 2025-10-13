@@ -26,6 +26,18 @@ export const userAPI = {
     return await res.json();
   },
   // Add updateProfile and other endpoints as needed
+  requestPasswordReset: async (email) => {
+    const res = await fetch(`${BASE_URL}/api/auth/password-reset/request`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email })
+    });
+    if (!res.ok) {
+      const error = await res.json();
+      throw new Error(error?.error || 'Failed to send reset link');
+    }
+    return await res.json();
+  },
 };
 
 export const marketAPI = {
