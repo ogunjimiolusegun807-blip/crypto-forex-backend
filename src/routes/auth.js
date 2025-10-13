@@ -52,15 +52,6 @@ router.post('/password-reset/confirm', async (req, res) => {
     res.status(500).json({ error: 'Failed to reset password.' });
   }
 });
-import express from 'express';
-import bcrypt from 'bcrypt';
-import jwt from 'jsonwebtoken';
-import User from '../models/User.js';
-import { Plan, Signal } from '../models/index.js';
-import { requireAdmin } from '../middleware/auth.js';
-import { v4 as uuidv4 } from 'uuid';
-const router = express.Router();
-const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret';
 
 // Register
 router.post('/register', async (req, res) => {
