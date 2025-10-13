@@ -1,3 +1,47 @@
+import { sendPasswordResetEmail } from '../utils/mailer.js';
+// Request password reset: generates token and sends email
+router.post('/password-reset/request', async (req, res) => {
+  const { email } = req.body;
+  if (!email) return res.status(400).json({ error: 'Email required.' });
+  try {
+    const user = await User.findOne({ where: { email } });
+    if (!user) return res.status(404).json({ error: 'User not found.' });
+    // Generate a secure, time-limited token
+    const resetToken = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '1h' });
+    // Construct reset link (adjust frontend URL as needed)
+    const resetLink = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/reset-password?token=${resetToken}`;
+    await sendPasswordResetEmail(email, resetLink);
+    return res.json({ success: true, message: 'Password reset link sent.' });
+  } catch (err) {
+    console.error('Password reset request error:', err);
+    res.status(500).json({ error: 'Failed to send password reset email.' });
+  }
+});
+
+// Reset password using token
+router.post('/password-reset/confirm', async (req, res) => {
+  const { token, newPassword } = req.body;
+  if (!token || !newPassword || newPassword.length < 6) {
+    return res.status(400).json({ error: 'Token and valid new password required.' });
+  }
+  try {
+    let decoded;
+    try {
+      decoded = jwt.verify(token, JWT_SECRET);
+    } catch (e) {
+      return res.status(400).json({ error: 'Invalid or expired token.' });
+    }
+    const user = await User.findByPk(decoded.userId);
+    if (!user) return res.status(404).json({ error: 'User not found.' });
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+    user.password = passwordHash;
+    await user.save();
+    return res.json({ success: true, message: 'Password updated.' });
+  } catch (err) {
+    console.error('Password reset confirm error:', err);
+    res.status(500).json({ error: 'Failed to reset password.' });
+  }
+});
 import express from 'express';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
@@ -137,6 +181,26 @@ router.put('/admin/change-password', async (req, res) => {
   } catch (err) {
     console.error('Admin password change error:', err);
     res.status(500).json({ error: 'Password update failed.' });
+  }
+});
+
+// Admin: Reset user password (set temporary password)
+router.post('/admin/users/:userId/reset-password', requireAdmin, async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { newPassword } = req.body;
+    if (!newPassword || newPassword.length < 6) {
+      return res.status(400).json({ error: 'A valid new password is required (min 6 chars).' });
+    }
+    const user = await User.findByPk(userId);
+    if (!user) return res.status(404).json({ error: 'User not found.' });
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+    user.password = passwordHash;
+    await user.save();
+    return res.json({ success: true, message: 'Password reset successfully.' });
+  } catch (err) {
+    console.error('Admin reset password error:', err);
+    res.status(500).json({ error: 'Failed to reset password.' });
   }
 });
 
