@@ -15,13 +15,25 @@ router.post('/password-reset/request', async (req, res) => {
   if (!email) return res.status(400).json({ error: 'Email required.' });
   try {
     const user = await User.findOne({ where: { email } });
-    if (!user) return res.status(404).json({ error: 'User not found.' });
+    // Do not reveal whether a user exists in production. We'll still log or return
+    // a usable resetLink for non-production testing environments.
+    if (!user) {
+      if (process.env.NODE_ENV === 'production') {
+        // Generic success response to avoid user enumeration.
+        return res.json({ success: true, message: 'If an account exists, a password reset link has been sent.' });
+      }
+      return res.status(404).json({ error: 'User not found.' });
+    }
     // Generate a secure, time-limited token
     const resetToken = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '1h' });
     // Construct reset link (adjust frontend URL as needed)
-    const resetLink = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/reset-password?token=${resetToken}`;
+    const resetLink = `${process.env.FRONTEND_URL || 'https://crypto-forex-three.vercel.app'}/reset-password?token=${resetToken}`;
     await sendPasswordResetEmail(email, resetLink);
-    return res.json({ success: true, message: 'Password reset link sent.' });
+    // In non-production, include the link in the JSON so testers can copy it directly.
+    if (process.env.NODE_ENV !== 'production') {
+      return res.json({ success: true, message: 'Password reset link sent.', resetLink });
+    }
+    return res.json({ success: true, message: 'If an account exists, a password reset link has been sent.' });
   } catch (err) {
     console.error('Password reset request error:', err);
     res.status(500).json({ error: 'Failed to send password reset email.' });
