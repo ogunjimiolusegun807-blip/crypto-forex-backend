@@ -101,4 +101,5 @@ const Signal = sequelize.define('Signal', {
   timestamps: false,
 });
 
-export { sequelize, Plan, Signal };
+import Activity from './Activity.js';
+export { sequelize, Plan, Signal, Activity };

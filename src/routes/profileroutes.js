@@ -33,7 +33,20 @@ const kycStorage = new CloudinaryStorage({
   }
 });
 const uploadKyc = multer({ storage: kycStorage });
-import { Plan, Signal } from '../models/index.js';
+import { Plan, Signal, Activity } from '../models/index.js';
+// GET /api/user/activities - Get full activity history (professional)
+router.get('/activities', authenticateToken, async (req, res) => {
+  try {
+    const activities = await Activity.findAll({
+      where: { userId: req.userId },
+      order: [['createdAt', 'DESC']],
+    });
+    res.json(activities);
+  } catch (err) {
+    console.error('Activities fetch error:', err);
+    res.status(500).json({ error: 'Failed to fetch activities.' });
+  }
+});
 
 // GET /api/user/profile - Get user profile
 router.get('/profile', authenticateToken, async (req, res) => {
@@ -78,12 +91,28 @@ router.post('/deposit', authenticateToken, async (req, res) => {
         proofMeta = f;
         proofUrl = f.path || f.secure_url || f.url || f.location || null;
       }
-      // Create a pending deposit activity. Admin will approve and credit balance later.
+      // Create a pending deposit activity in the Activity table (professional logging)
+      const depositActivity = await Activity.create({
+        userId: user.id,
+        type: 'deposit',
+        description: `Deposit of $${Number(amount)}`,
+        amount: Number(amount),
+        status: 'pending',
+        meta: { proof: proofUrl, proofMeta },
+      });
+      // (Optional) Also keep legacy JSON array for backward compatibility
       if (!Array.isArray(user.activities)) user.activities = [];
-  const depositActivity = { id: uuidv4(), type: 'deposit', amount: Number(amount), date: new Date(), proof: proofUrl, proofUrl, proofMeta, status: 'pending' };
-      user.activities = [...user.activities, depositActivity];
+      user.activities = [...user.activities, {
+        id: depositActivity.id,
+        type: 'deposit',
+        amount: Number(amount),
+        date: depositActivity.createdAt,
+        proof: proofUrl,
+        proofMeta,
+        status: 'pending',
+      }];
       await user.save();
-      // Return activity but don't modify balance yet
+      // Return the new activity
       res.json({ activity: depositActivity });
       
     } catch (err) {
@@ -116,10 +145,25 @@ router.post('/withdrawal', authenticateToken, async (req, res) => {
     if (!user) return res.status(404).json({ error: 'User not found.' });
     // Collect withdrawal form fields from request body
     const { withdrawalType, bankName, accountName, accountNumber, walletAddress } = req.body;
-    // Create a pending withdrawal activity. Admin must approve to debit balance.
+    // Professional logging: create withdrawal activity in Activity table
+    const withdrawalActivity = await Activity.create({
+      userId: user.id,
+      type: 'withdrawal',
+      description: `Withdrawal of $${Number(amount)}`,
+      amount: Number(amount),
+      status: 'pending',
+      meta: {
+        method: withdrawalType || null,
+        bankName: bankName || null,
+        accountName: accountName || null,
+        accountNumber: accountNumber || null,
+        walletAddress: walletAddress || null,
+      },
+    });
+    // (Optional) Also keep legacy JSON array for backward compatibility
     if (!Array.isArray(user.activities)) user.activities = [];
-    const withdrawalActivity = {
-      id: uuidv4(),
+    user.activities = [...user.activities, {
+      id: withdrawalActivity.id,
       type: 'withdrawal',
       amount: Number(amount),
       method: withdrawalType || null,
@@ -127,10 +171,9 @@ router.post('/withdrawal', authenticateToken, async (req, res) => {
       accountName: accountName || null,
       accountNumber: accountNumber || null,
       walletAddress: walletAddress || null,
-      date: new Date(),
-      status: 'pending'
-    };
-    user.activities = [...user.activities, withdrawalActivity];
+      date: withdrawalActivity.createdAt,
+      status: 'pending',
+    }];
     await user.save();
     res.json({ activity: withdrawalActivity });
   } catch (err) {
@@ -177,11 +220,26 @@ router.post('/plan', authenticateToken, async (req, res) => {
       return res.status(400).json({ error: 'Insufficient balance.' });
     }
 
-    // Debit and create a plan activity with id for traceability
+    // Debit and create a plan activity in Activity table (professional logging)
     user.balance = Number(user.balance || 0) - Number(amount);
+    const planActivity = await Activity.create({
+      userId: user.id,
+      type: 'trade',
+      description: `Subscribed to plan ${plan ? plan.name : planId} with $${Number(amount)}`,
+      amount: Number(amount),
+      status: 'active',
+      meta: { planId, planName: plan ? plan.name : undefined },
+    });
+    // (Optional) Also keep legacy JSON array for backward compatibility
     if (!Array.isArray(user.activities)) user.activities = [];
-    const planActivity = { id: uuidv4(), type: 'plan', planId, amount: Number(amount), date: new Date(), status: 'active' };
-    user.activities = [...user.activities, planActivity];
+    user.activities = [...user.activities, {
+      id: planActivity.id,
+      type: 'trade',
+      planId,
+      amount: Number(amount),
+      date: planActivity.createdAt,
+      status: 'active',
+    }];
     await user.save();
     res.json({ success: true, balance: Number(user.balance), activity: planActivity });
   } catch (err) {
@@ -251,11 +309,26 @@ router.post('/signal/subscribe', authenticateToken, async (req, res) => {
       return res.status(400).json({ error: 'Insufficient balance.' });
     }
 
-    // Debit and create activity
+    // Debit and create signal subscription activity in Activity table (professional logging)
     user.balance = Number(user.balance || 0) - price;
+    const signalActivity = await Activity.create({
+      userId: user.id,
+      type: 'signal',
+      description: `Subscribed to signal ${signal ? signal.name : signalId} for $${price}`,
+      amount: price,
+      status: 'active',
+      meta: { signalId, signalName: signal ? signal.name : undefined },
+    });
+    // (Optional) Also keep legacy JSON array for backward compatibility
     if (!Array.isArray(user.activities)) user.activities = [];
-    const signalActivity = { id: uuidv4(), type: 'signal', signalId, amount: price, date: new Date(), status: 'active' };
-    user.activities = [...user.activities, signalActivity];
+    user.activities = [...user.activities, {
+      id: signalActivity.id,
+      type: 'signal',
+      signalId,
+      amount: price,
+      date: signalActivity.createdAt,
+      status: 'active',
+    }];
     await user.save();
     res.json({ success: true, balance: Number(user.balance), activity: signalActivity });
   } catch (err) {
@@ -322,11 +395,25 @@ router.post('/kyc', authenticateToken, async (req, res) => {
       const user = await User.findByPk(req.user.userId || req.userId);
       if (!user) return res.status(404).json({ error: 'User not found.' });
       user.kycStatus = 'pending';
+      // Professional logging: create KYC activity in Activity table
+      const kycActivity = await Activity.create({
+        userId: user.id,
+        type: 'kyc',
+        description: 'KYC submission',
+        status: 'pending',
+        meta: kycData,
+      });
+      // (Optional) Also keep legacy JSON array for backward compatibility
       if (!Array.isArray(user.activities)) user.activities = [];
-  const activity = { id: uuidv4(), type: 'kyc', kycData, date: new Date(), status: 'pending' };
-      user.activities = [...user.activities, activity];
+      user.activities = [...user.activities, {
+        id: kycActivity.id,
+        type: 'kyc',
+        kycData,
+        date: kycActivity.createdAt,
+        status: 'pending',
+      }];
       await user.save();
-      res.json(activity);
+      res.json(kycActivity);
     } catch (err) {
       console.error('KYC error:', err);
       res.status(500).json({ error: 'KYC submission failed.' });
