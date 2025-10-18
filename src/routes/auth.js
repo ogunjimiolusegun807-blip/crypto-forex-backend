@@ -1,3 +1,14 @@
+
+import express from 'express';
+import bcrypt from 'bcrypt';
+import jwt from 'jsonwebtoken';
+import { User, Plan, Signal, Activity } from '../models/index.js';
+import { requireAdmin } from '../middleware/auth.js';
+import { v4 as uuidv4 } from 'uuid';
+import { sendPasswordResetEmail } from '../utils/mailer.js';
+const router = express.Router();
+const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret';
+
 // Approve deposit and credit user balance (admin only)
 router.post('/admin/deposits/:id/approve', requireAdmin, async (req, res) => {
   const depositId = req.params.id;
@@ -23,15 +34,6 @@ router.post('/admin/deposits/:id/approve', requireAdmin, async (req, res) => {
     res.status(500).json({ error: 'Server error approving deposit.' });
   }
 });
-import express from 'express';
-import bcrypt from 'bcrypt';
-import jwt from 'jsonwebtoken';
-import { User, Plan, Signal } from '../models/index.js';
-import { requireAdmin } from '../middleware/auth.js';
-import { v4 as uuidv4 } from 'uuid';
-import { sendPasswordResetEmail } from '../utils/mailer.js';
-const router = express.Router();
-const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret';
 
 // Request password reset: generates token and sends email
 router.post('/password-reset/request', async (req, res) => {
