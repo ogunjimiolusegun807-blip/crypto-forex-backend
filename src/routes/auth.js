@@ -707,6 +707,31 @@ router.post('/admin/deposits/user/:userId/approve', requireAdmin, async (req, re
   }
 });
 
+// Admin: Approve Withdrawal by userId (fallback when activityId isn't present)
+router.post('/admin/withdrawals/user/:userId/approve', requireAdmin, async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const overrideAmount = req.body && typeof req.body.amount !== 'undefined' ? Number(req.body.amount) : null;
+    const user = await User.findByPk(userId);
+    if (!user) return res.status(404).json({ error: 'User not found.' });
+    const activities = Array.isArray(user.activities) ? user.activities : [];
+    // find latest withdrawal activity
+    const found = activities.map((a, i) => ({ a, i })).reverse().find(x => x.a.type === 'withdrawal');
+    if (!found) return res.status(404).json({ error: 'No withdrawal activity found for user.' });
+    const idx = found.i;
+    const amt = overrideAmount !== null ? overrideAmount : Number(activities[idx].amount || 0);
+    if (Number(user.balance) < amt) return res.status(400).json({ error: 'Insufficient balance.' });
+    user.balance = Number(user.balance) - amt;
+    const updatedActivities = activities.filter((_, i) => i !== idx);
+    user.activities = updatedActivities;
+    await user.save();
+    return res.json({ success: true, userId: user.id, balance: user.balance });
+  } catch (err) {
+    console.error('Approve withdrawal by user error:', err);
+    res.status(500).json({ error: 'Failed to approve withdrawal.' });
+  }
+});
+
 // Admin: Reject Deposit by userId (fallback when activityId isn't present)
 router.post('/admin/deposits/user/:userId/reject', requireAdmin, async (req, res) => {
   try {
