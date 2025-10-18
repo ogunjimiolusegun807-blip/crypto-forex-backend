@@ -301,25 +301,19 @@ router.get('/admin/deposits', requireAdmin, async (req, res) => {
     if (!decoded || decoded.role !== 'admin') {
       return res.status(403).json({ error: 'Forbidden.' });
     }
-    // Aggregate all deposit activities from all users (only pending)
-    const users = await User.findAll();
-    let deposits = [];
-    users.forEach(user => {
-      const activities = Array.isArray(user.activities) ? user.activities : [];
-      activities.forEach(activity => {
-        const status = typeof activity.status === 'undefined' ? 'pending' : activity.status;
-        if (activity.type === 'deposit' && status === 'pending') {
-          deposits.push({
-            ...activity,
-            userId: user.id,
-            username: user.name,
-            email: user.email
-          });
-        }
-      });
-    });
-    // Return the array directly
-    res.json(deposits);
+    // Get all pending deposits from Activity table
+    const pendingDeposits = await Activity.findAll({ where: { type: 'deposit', status: 'pending' } });
+    // Attach user info to each deposit
+    const userIds = pendingDeposits.map(d => d.userId);
+    const users = await User.findAll({ where: { id: userIds } });
+    const userMap = {};
+    users.forEach(u => { userMap[u.id] = u; });
+    const depositsWithUser = pendingDeposits.map(deposit => ({
+      ...deposit.dataValues,
+      username: userMap[deposit.userId]?.name || '',
+      email: userMap[deposit.userId]?.email || ''
+    }));
+    res.json(depositsWithUser);
   } catch (err) {
     console.error('Admin get deposits error:', err);
     res.status(500).json({ error: 'Failed to fetch deposits.' });
