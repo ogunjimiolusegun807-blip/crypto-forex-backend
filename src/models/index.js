@@ -5,6 +5,14 @@ const sequelize = new Sequelize(process.env.DATABASE_URL, {
   logging: false,
 });
 
+// Import model definitions as functions
+import defineUser from './User.js';
+import defineActivity from './Activity.js';
+
+// Define models
+const User = defineUser(sequelize, DataTypes);
+const Activity = defineActivity(sequelize, DataTypes);
+
 const Plan = sequelize.define('Plan', {
   id: {
     type: DataTypes.INTEGER,
@@ -101,5 +109,8 @@ const Signal = sequelize.define('Signal', {
   timestamps: false,
 });
 
-import Activity from './Activity.js';
-export { sequelize, Plan, Signal, Activity };
+// Set up associations after all models are defined
+Activity.belongsTo(User, { foreignKey: 'userId' });
+User.hasMany(Activity, { foreignKey: 'userId', as: 'activitiesLog' });
+
+export { sequelize, Plan, Signal, Activity, User };
