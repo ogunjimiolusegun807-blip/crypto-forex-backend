@@ -1,3 +1,28 @@
+// Approve deposit and credit user balance (admin only)
+router.post('/admin/deposits/:id/approve', requireAdmin, async (req, res) => {
+  const depositId = req.params.id;
+  try {
+    // Find deposit activity by ID and type
+    const deposit = await Activity.findOne({ where: { id: depositId, type: 'deposit' } });
+    if (!deposit) return res.status(404).json({ error: 'Deposit activity not found.' });
+
+    // Mark deposit as approved
+    deposit.status = 'approved';
+    await deposit.save();
+
+    // Credit user balance
+    const user = await User.findByPk(deposit.userId);
+    if (user) {
+      user.balance += deposit.amount || 0;
+      await user.save();
+    }
+
+    res.json({ success: true, message: 'Deposit approved and user credited.' });
+  } catch (err) {
+    console.error('Approve deposit error:', err);
+    res.status(500).json({ error: 'Server error approving deposit.' });
+  }
+});
 import express from 'express';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
