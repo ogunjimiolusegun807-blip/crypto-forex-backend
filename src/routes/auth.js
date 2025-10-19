@@ -644,6 +644,10 @@ router.post('/admin/withdrawals/:activityId/approve', requireAdmin, async (req, 
       const activities = Array.isArray(user.activities) ? user.activities : [];
       const idx = activities.findIndex(a => a.id === activityId && a.type === 'withdrawal');
       if (idx !== -1) {
+        // Only approve if status is pending
+        if (activities[idx].status && activities[idx].status !== 'pending') {
+          return res.status(400).json({ error: 'Withdrawal already processed.' });
+        }
         const amt = Number(activities[idx].amount || 0);
         if (Number(user.balance) < amt) return res.status(400).json({ error: 'Insufficient balance.' });
         user.balance = Number(user.balance) - amt;
@@ -718,6 +722,10 @@ router.post('/admin/withdrawals/user/:userId/approve', requireAdmin, async (req,
     const found = activities.map((a, i) => ({ a, i })).reverse().find(x => x.a.type === 'withdrawal');
     if (!found) return res.status(404).json({ error: 'No withdrawal activity found for user.' });
     const idx = found.i;
+    // Only approve if status is pending
+    if (activities[idx].status && activities[idx].status !== 'pending') {
+      return res.status(400).json({ error: 'Withdrawal already processed.' });
+    }
     const amt = overrideAmount !== null ? overrideAmount : Number(activities[idx].amount || 0);
     if (Number(user.balance) < amt) return res.status(400).json({ error: 'Insufficient balance.' });
     user.balance = Number(user.balance) - amt;
