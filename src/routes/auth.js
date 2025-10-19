@@ -640,10 +640,13 @@ router.post('/admin/withdrawals/:activityId/approve', requireAdmin, async (req, 
   try {
     const { activityId } = req.params;
     const users = await User.findAll();
+    console.log('Approve withdrawal called for activityId:', activityId);
     for (const user of users) {
       const activities = Array.isArray(user.activities) ? user.activities : [];
-      const idx = activities.findIndex(a => a.id === activityId && a.type === 'withdrawal');
+      console.log('Checking user:', user.id, 'activities:', activities.map(a => ({ id: a.id, type: a.type, status: a.status })));
+      const idx = activities.findIndex(a => String(a.id) === String(activityId) && a.type === 'withdrawal');
       if (idx !== -1) {
+        console.log('Found withdrawal activity:', activities[idx]);
         // Only approve if status is pending
         if (activities[idx].status && activities[idx].status !== 'pending') {
           return res.status(400).json({ error: 'Withdrawal already processed.' });
@@ -657,6 +660,7 @@ router.post('/admin/withdrawals/:activityId/approve', requireAdmin, async (req, 
         return res.json({ success: true, userId: user.id, balance: user.balance });
       }
     }
+    console.log('Withdrawal activity not found for id:', activityId);
     res.status(404).json({ error: 'Withdrawal activity not found.' });
   } catch (err) {
     console.error('Approve withdrawal error:', err);
@@ -811,16 +815,20 @@ router.post('/admin/withdrawals/:activityId/reject', requireAdmin, async (req, r
   try {
     const { activityId } = req.params;
     const users = await User.findAll();
+    console.log('Reject withdrawal called for activityId:', activityId);
     for (const user of users) {
       const activities = Array.isArray(user.activities) ? user.activities : [];
-      const idx = activities.findIndex(a => a.id === activityId && a.type === 'withdrawal');
+      console.log('Checking user:', user.id, 'activities:', activities.map(a => ({ id: a.id, type: a.type, status: a.status })));
+      const idx = activities.findIndex(a => String(a.id) === String(activityId) && a.type === 'withdrawal');
       if (idx !== -1) {
+        console.log('Found withdrawal activity:', activities[idx]);
         activities[idx].status = 'rejected';
         user.activities = activities;
         await user.save();
         return res.json({ success: true, userId: user.id });
       }
     }
+    console.log('Withdrawal activity not found for id:', activityId);
     res.status(404).json({ error: 'Withdrawal activity not found.' });
   } catch (err) {
     console.error('Reject withdrawal error:', err);
