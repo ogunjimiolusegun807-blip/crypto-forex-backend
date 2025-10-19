@@ -759,6 +759,31 @@ router.post('/admin/deposits/user/:userId/reject', requireAdmin, async (req, res
   }
 });
 
+// Admin: Reject Withdrawal by userId (fallback when activityId isn't present)
+router.post('/admin/withdrawals/user/:userId/reject', requireAdmin, async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const user = await User.findByPk(userId);
+    if (!user) return res.status(404).json({ error: 'User not found.' });
+    const activities = Array.isArray(user.activities) ? user.activities : [];
+    // find latest withdrawal activity
+    const found = activities.map((a, i) => ({ a, i })).reverse().find(x => x.a.type === 'withdrawal');
+    if (!found) return res.status(404).json({ error: 'No withdrawal activity found for user.' });
+    const idx = found.i;
+    // Only reject if status is pending
+    if (activities[idx].status && activities[idx].status !== 'pending') {
+      return res.status(400).json({ error: 'Withdrawal already processed.' });
+    }
+    activities[idx].status = 'rejected';
+    user.activities = activities;
+    await user.save();
+    return res.json({ success: true, userId: user.id });
+  } catch (err) {
+    console.error('Reject withdrawal by user error:', err);
+    res.status(500).json({ error: 'Failed to reject withdrawal.' });
+  }
+});
+
 // Admin: Manual credit to a user (any registered user)
 router.post('/admin/credit-user', requireAdmin, async (req, res) => {
   try {
