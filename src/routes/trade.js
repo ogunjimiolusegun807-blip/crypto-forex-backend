@@ -6,7 +6,9 @@ const router = express.Router();
 router.post('/open', async (req, res) => {
   try {
     const { userId, symbol, amount, multiplier, entryPrice } = req.body;
+    console.log('Trade open request:', { userId, symbol, amount, multiplier, entryPrice });
     const user = await User.findByPk(userId);
+    console.log('User lookup result:', user);
     if (!user || user.balance < amount) {
       return res.status(400).json({ error: 'Insufficient balance or user not found.' });
     }
