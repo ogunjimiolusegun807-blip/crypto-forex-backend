@@ -61,4 +61,14 @@ sequelize.sync()
   })
   .catch((err) => {
     console.error('Database sync error:', err);
+    if (err && err.stack) console.error(err.stack);
   });
+
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught Exception:', err);
+  if (err && err.stack) console.error(err.stack);
+});
+process.on('unhandledRejection', (err) => {
+  console.error('Unhandled Rejection:', err);
+  if (err && err.stack) console.error(err.stack);
+});
