@@ -311,7 +311,8 @@ router.get('/admin/deposits', requireAdmin, async (req, res) => {
     const depositsWithUser = pendingDeposits.map(deposit => ({
       ...deposit.dataValues,
       username: userMap[deposit.userId]?.name || '',
-      email: userMap[deposit.userId]?.email || ''
+      email: userMap[deposit.userId]?.email || '',
+      proofUrl: deposit.dataValues.meta?.proof || null
     }));
     res.json(depositsWithUser);
   } catch (err) {
