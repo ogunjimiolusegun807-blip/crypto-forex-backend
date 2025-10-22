@@ -1,6 +1,5 @@
 import express from 'express';
-import Trade from '../models/Trade.js';
-import User from '../models/User.js';
+import { Trade, User } from '../models/index.js';
 const router = express.Router();
 
 // Open a trade
