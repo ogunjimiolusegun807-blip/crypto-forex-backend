@@ -8,10 +8,12 @@ const sequelize = new Sequelize(process.env.DATABASE_URL, {
 // Import model definitions as functions
 import defineUser from './User.js';
 import defineActivity from './Activity.js';
+import defineTrade from './Trade.js';
 
 // Define models
 const User = defineUser(sequelize, DataTypes);
 const Activity = defineActivity(sequelize, DataTypes);
+const Trade = defineTrade(sequelize, DataTypes);
 
 const Plan = sequelize.define('Plan', {
   id: {
@@ -113,4 +115,4 @@ const Signal = sequelize.define('Signal', {
 Activity.belongsTo(User, { foreignKey: 'userId' });
 User.hasMany(Activity, { foreignKey: 'userId', as: 'activitiesLog' });
 
-export { sequelize, Plan, Signal, Activity, User };
+export { sequelize, Plan, Signal, Activity, User, Trade };

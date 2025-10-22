@@ -1,17 +1,56 @@
-// Trade model for live trading
-const mongoose = require('mongoose');
-
-const TradeSchema = new mongoose.Schema({
-  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-  symbol: { type: String, required: true },
-  amount: { type: Number, required: true },
-  multiplier: { type: Number, required: true },
-  entryPrice: { type: Number, required: true },
-  exitPrice: { type: Number },
-  profitLoss: { type: Number },
-  status: { type: String, enum: ['open', 'closed'], default: 'open' },
-  openedAt: { type: Date, default: Date.now },
-  closedAt: { type: Date },
-});
-
-module.exports = mongoose.model('Trade', TradeSchema);
+// Trade model for live trading (Sequelize/Postgres)
+export default (sequelize, DataTypes) => {
+  const Trade = sequelize.define('Trade', {
+    id: {
+      type: DataTypes.INTEGER,
+      autoIncrement: true,
+      primaryKey: true,
+    },
+    userId: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+    },
+    symbol: {
+      type: DataTypes.STRING,
+      allowNull: false,
+    },
+    amount: {
+      type: DataTypes.FLOAT,
+      allowNull: false,
+    },
+    multiplier: {
+      type: DataTypes.FLOAT,
+      allowNull: false,
+    },
+    entryPrice: {
+      type: DataTypes.FLOAT,
+      allowNull: false,
+    },
+    exitPrice: {
+      type: DataTypes.FLOAT,
+      allowNull: true,
+    },
+    profitLoss: {
+      type: DataTypes.FLOAT,
+      allowNull: true,
+    },
+    status: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      defaultValue: 'open',
+    },
+    openedAt: {
+      type: DataTypes.DATE,
+      allowNull: false,
+      defaultValue: DataTypes.NOW,
+    },
+    closedAt: {
+      type: DataTypes.DATE,
+      allowNull: true,
+    }
+  }, {
+    tableName: 'trades',
+    timestamps: false,
+  });
+  return Trade;
+}
