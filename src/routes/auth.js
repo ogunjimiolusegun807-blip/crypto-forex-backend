@@ -243,6 +243,106 @@ router.post('/admin/users/:userId/reset-password', requireAdmin, async (req, res
   }
 });
 
+// --- Trade and Balance Sync Endpoints ---
+import { Op } from 'sequelize';
+
+// Middleware to require user authentication
+function requireUser(req, res, next) {
+  const authHeader = req.headers.authorization;
+  if (!authHeader) return res.status(401).json({ error: 'Authorization header missing.' });
+  const token = authHeader.split(' ')[1];
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    req.userId = decoded.userId;
+    next();
+  } catch (e) {
+    return res.status(401).json({ error: 'Invalid token.' });
+  }
+}
+
+// GET user trades
+router.get('/user/trades', requireUser, async (req, res) => {
+  try {
+    const activities = await Activity.findAll({
+      where: {
+        userId: req.userId,
+        type: { [Op.in]: ['trade', 'deposit', 'withdrawal'] }
+      },
+      order: [['createdAt', 'DESC']]
+    });
+    res.json(activities);
+  } catch (err) {
+    console.error('Get user trades error:', err);
+    res.status(500).json({ error: 'Failed to fetch trades.' });
+  }
+});
+
+// POST new trade
+router.post('/user/trades', requireUser, async (req, res) => {
+  try {
+    const { type, amount, meta } = req.body;
+    if (!type || !['trade', 'deposit', 'withdrawal'].includes(type)) {
+      return res.status(400).json({ error: 'Invalid trade type.' });
+    }
+    if (typeof amount !== 'number' || isNaN(amount)) {
+      return res.status(400).json({ error: 'Invalid amount.' });
+    }
+    const activity = await Activity.create({
+      userId: req.userId,
+      type,
+      amount,
+      status: 'completed',
+      meta: meta || {},
+      createdAt: new Date()
+    });
+    // Optionally update user balance for deposit/withdrawal
+    if (type === 'deposit' || type === 'withdrawal') {
+      const user = await User.findByPk(req.userId);
+      if (user) {
+        let newBalance = user.balance;
+        if (type === 'deposit') newBalance += amount;
+        if (type === 'withdrawal') newBalance -= amount;
+        user.balance = Math.max(0, newBalance);
+        await user.save();
+      }
+    }
+    res.json(activity);
+  } catch (err) {
+    console.error('Create trade error:', err);
+    res.status(500).json({ error: 'Failed to create trade.' });
+  }
+});
+
+// GET user balance
+router.get('/user/balance', requireUser, async (req, res) => {
+  try {
+    const user = await User.findByPk(req.userId);
+    if (!user) return res.status(404).json({ error: 'User not found.' });
+    res.json({ balance: user.balance });
+  } catch (err) {
+    console.error('Get balance error:', err);
+    res.status(500).json({ error: 'Failed to fetch balance.' });
+  }
+});
+
+// POST update user balance
+router.post('/user/balance', requireUser, async (req, res) => {
+  try {
+    const { balance } = req.body;
+    if (typeof balance !== 'number' || isNaN(balance)) {
+      return res.status(400).json({ error: 'Invalid balance.' });
+    }
+    const user = await User.findByPk(req.userId);
+    if (!user) return res.status(404).json({ error: 'User not found.' });
+    user.balance = Math.max(0, balance);
+    await user.save();
+    res.json({ success: true, balance: user.balance });
+  } catch (err) {
+    console.error('Update balance error:', err);
+    res.status(500).json({ error: 'Failed to update balance.' });
+  }
+});
+
 export default router;
 // Admin: Get all KYC requests (pending)
 router.get('/admin/kyc', requireAdmin, async (req, res) => {

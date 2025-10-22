@@ -38,6 +38,46 @@ export const userAPI = {
     }
     return await res.json();
   },
+
+  // --- Trade and Balance Sync Endpoints ---
+  getTrades: async (token) => {
+    const res = await fetch(`${BASE_URL}/api/auth/user/trades`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    if (!res.ok) throw new Error('Failed to fetch trades');
+    return await res.json();
+  },
+  saveTrade: async (token, trade) => {
+    const res = await fetch(`${BASE_URL}/api/auth/user/trades`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify(trade)
+    });
+    if (!res.ok) throw new Error('Failed to save trade');
+    return await res.json();
+  },
+  getBalance: async (token) => {
+    const res = await fetch(`${BASE_URL}/api/auth/user/balance`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    if (!res.ok) throw new Error('Failed to fetch balance');
+    return await res.json();
+  },
+  saveBalance: async (token, balance) => {
+    const res = await fetch(`${BASE_URL}/api/auth/user/balance`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({ balance })
+    });
+    if (!res.ok) throw new Error('Failed to update balance');
+    return await res.json();
+  },
 };
 
 export const marketAPI = {
