@@ -4,7 +4,7 @@ import { CloudinaryStorage } from 'multer-storage-cloudinary';
 import jwt from 'jsonwebtoken';
 import { User } from '../models/index.js';
 import { v4 as uuidv4 } from 'uuid';
-import { authenticateToken } from '../middleware/auth.js';
+import { authenticateToken, requireAdmin } from '../middleware/auth.js';
 
 const router = express.Router();
 // Cloudinary config (use environment variables for credentials)
@@ -493,4 +493,32 @@ router.get('/referrals', authenticateToken, async (req, res) => {
   }
 });
 
+// ADMIN: Repair NaN/non-numeric balances across users
+// POST /api/admin/repair-balances
+router.post('/admin/repair-balances', requireAdmin, async (req, res) => {
+  try {
+    const users = await User.findAll({ attributes: ['id', 'email', 'balance'] });
+    let fixed = 0;
+    const sample = [];
+    for (const u of users) {
+      const raw = u.balance;
+      const numeric = Number(raw);
+      if (!Number.isFinite(numeric) || Number.isNaN(numeric)) {
+        await u.update({ balance: 0 });
+        sample.push({ id: u.id, email: u.email, from: raw, to: 0 });
+        fixed++;
+      } else if (numeric !== raw) {
+        await u.update({ balance: numeric });
+        sample.push({ id: u.id, email: u.email, from: raw, to: numeric });
+        fixed++;
+      }
+    }
+    res.json({ fixed, sample });
+  } catch (err) {
+    console.error('Admin repair error:', err);
+    res.status(500).json({ error: 'Repair failed.' });
+  }
+});
+
 export default router;
+
