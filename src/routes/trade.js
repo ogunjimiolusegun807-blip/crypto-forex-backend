@@ -1,7 +1,7 @@
-const express = require('express');
+import express from 'express';
+import Trade from '../models/Trade.js';
+import User from '../models/User.js';
 const router = express.Router();
-const Trade = require('../models/Trade');
-const User = require('../models/User');
 
 // Open a trade
 router.post('/open', async (req, res) => {
