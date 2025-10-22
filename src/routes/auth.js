@@ -348,7 +348,13 @@ router.get('/admin/withdrawals', requireAdmin, async (req, res) => {
             ...activity,
             userId: user.id,
             username: user.name,
-            email: user.email
+            email: user.email,
+            amount: activity.amount || null,
+            method: activity.method || activity.meta?.method || null,
+            bankName: activity.bankName || activity.meta?.bankName || null,
+            accountName: activity.accountName || activity.meta?.accountName || null,
+            accountNumber: activity.accountNumber || activity.meta?.accountNumber || null,
+            walletAddress: activity.walletAddress || activity.meta?.walletAddress || null
           });
         }
       });
