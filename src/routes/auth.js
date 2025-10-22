@@ -321,8 +321,16 @@ router.get('/user/balance', requireUser, async (req, res) => {
     const user = await User.findByPk(req.userId);
     console.log('GET /user/balance request for userId=', req.userId, 'found user=', !!user);
     if (!user) return res.status(404).json({ error: 'User not found.' });
-    console.log('Returning balance for user', user.id, user.balance);
-    res.json({ balance: user.balance });
+    // Ensure balance is a valid number. If it's NaN or not set, repair and persist.
+    let bal = Number(user.balance);
+    if (Number.isNaN(bal)) {
+      console.warn('User balance is NaN for user', user.id, '- repairing to 0');
+      user.balance = 0;
+      await user.save();
+      bal = 0;
+    }
+    console.log('Returning balance for user', user.id, bal);
+    res.json({ balance: bal });
   } catch (err) {
     console.error('Get balance error:', err);
     res.status(500).json({ error: 'Failed to fetch balance.' });
