@@ -371,6 +371,20 @@ router.get('/admin/plans', requireAdmin, async (req, res) => {
   }
 });
 
+// Admin: Get activities for a specific user (debug / verification)
+router.get('/admin/users/:userId/activities', requireAdmin, async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const user = await User.findByPk(userId);
+    if (!user) return res.status(404).json({ error: 'User not found.' });
+    const activities = Array.isArray(user.activities) ? user.activities : [];
+    return res.json({ userId: user.id, activities });
+  } catch (err) {
+    console.error('Admin get user activities error:', err);
+    res.status(500).json({ error: 'Failed to fetch user activities.' });
+  }
+});
+
 // Admin: Create a new plan
 router.post('/admin/plans', requireAdmin, async (req, res) => {
   try {
