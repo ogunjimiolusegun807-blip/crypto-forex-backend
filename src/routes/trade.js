@@ -8,16 +8,23 @@ router.post('/open', async (req, res) => {
     const { userId, symbol, amount, multiplier, entryPrice } = req.body;
     console.log('Trade open request:', { userId, symbol, amount, multiplier, entryPrice });
     const user = await User.findByPk(userId);
-    console.log('User lookup result:', user);
-    if (!user || user.balance < amount) {
-      return res.status(400).json({ error: 'Insufficient balance or user not found.' });
+    if (!user) {
+      console.error('Open trade: user not found', userId);
+      return res.status(404).json({ error: 'User not found.' });
     }
-    // Optionally lock amount
-    await user.update({ balance: user.balance - amount });
-    const trade = await Trade.create({ userId, symbol, amount, multiplier, entryPrice });
-    res.json({ trade, balance: user.balance - amount });
+    if (Number(user.balance || 0) < Number(amount || 0)) {
+      console.error('Open trade: insufficient balance', { userId, balance: user.balance, amount });
+      return res.status(400).json({ error: 'Insufficient balance.' });
+    }
+    // Debit user balance and create trade
+    const newBalance = Number(user.balance || 0) - Number(amount || 0);
+    user.balance = newBalance;
+    await user.save();
+    const trade = await Trade.create({ userId, symbol, amount, multiplier, entryPrice, status: 'open', openedAt: new Date() });
+    res.json({ trade, balance: user.balance });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('Open trade error:', err);
+    res.status(500).json({ error: 'Server error opening trade.' });
   }
 });
 
@@ -27,6 +34,7 @@ router.post('/close', async (req, res) => {
     const { tradeId, exitPrice } = req.body;
     const trade = await Trade.findByPk(tradeId);
     if (!trade || trade.status !== 'open') {
+      console.error('Close trade: trade not found or invalid status', { tradeId, trade });
       return res.status(400).json({ error: 'Trade not found or already closed.' });
     }
     const profitLoss = (exitPrice - trade.entryPrice) * trade.amount * trade.multiplier;
@@ -37,10 +45,16 @@ router.post('/close', async (req, res) => {
       closedAt: new Date()
     });
     const user = await User.findByPk(trade.userId);
-    await user.update({ balance: user.balance + profitLoss });
-    res.json({ trade, balance: user.balance + profitLoss });
+    if (!user) {
+      console.error('Close trade: user not found for trade', trade.id);
+      return res.status(404).json({ error: 'User not found for trade.' });
+    }
+    user.balance = Number(user.balance || 0) + Number(profitLoss || 0);
+    await user.save();
+    res.json({ trade, balance: user.balance });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('Close trade error:', err);
+    res.status(500).json({ error: 'Server error closing trade.' });
   }
 });
 
