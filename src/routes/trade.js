@@ -1,10 +1,11 @@
 
 import express from 'express';
 import { Trade, User } from '../models/index.js';
+import { authenticateToken } from '../middleware/auth.js';
 const router = express.Router();
 
 // Get all trade history for authenticated user
-router.get('/history', async (req, res) => {
+router.get('/history', authenticateToken, async (req, res) => {
   try {
     // Assume req.userId is set by auth middleware (if not, fallback to query param)
     const userId = req.userId || req.query.userId;
@@ -21,7 +22,7 @@ router.get('/history', async (req, res) => {
 });
 
 // Open a trade
-router.post('/open', async (req, res) => {
+router.post('/open', authenticateToken, async (req, res) => {
   try {
     const { userId, symbol, amount, multiplier, entryPrice } = req.body;
     console.log('Trade open request:', { userId, symbol, amount, multiplier, entryPrice });
@@ -47,7 +48,7 @@ router.post('/open', async (req, res) => {
 });
 
 // Close a trade
-router.post('/close', async (req, res) => {
+router.post('/close', authenticateToken, async (req, res) => {
   try {
     const { tradeId, exitPrice } = req.body;
     const trade = await Trade.findByPk(tradeId);
