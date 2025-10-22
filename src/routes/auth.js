@@ -670,6 +670,8 @@ router.post('/admin/withdrawals/:activityId/approve', requireAdmin, async (req, 
         if (Number(user.balance) < amt) return res.status(400).json({ error: 'Insufficient balance.' });
   user.balance = Number(user.balance) - amt;
   activities[idx].status = 'approved';
+  // Update status in Activity table for history
+  await Activity.update({ status: 'approved' }, { where: { id: activityId, type: 'withdrawal' } });
   // Remove the approved withdrawal activity from user's activities
   const updatedActivities = activities.filter((_, i) => i !== idx);
   user.activities = updatedActivities;
@@ -752,6 +754,8 @@ router.post('/admin/withdrawals/user/:userId/approve', requireAdmin, async (req,
     if (Number(user.balance) < amt) return res.status(400).json({ error: 'Insufficient balance.' });
   user.balance = Number(user.balance) - amt;
   activities[idx].status = 'approved';
+  // Update status in Activity table for history
+  await Activity.update({ status: 'approved' }, { where: { id: activities[idx].id, type: 'withdrawal' } });
   // Remove the approved withdrawal activity from user's activities
   const updatedActivities = activities.filter((_, i) => i !== idx);
   user.activities = updatedActivities;
@@ -799,6 +803,8 @@ router.post('/admin/withdrawals/user/:userId/reject', requireAdmin, async (req, 
       return res.status(400).json({ error: 'Withdrawal already processed.' });
     }
   activities[idx].status = 'rejected';
+  // Update status in Activity table for history
+  await Activity.update({ status: 'rejected' }, { where: { id: activities[idx].id, type: 'withdrawal' } });
   // Remove the rejected withdrawal activity from user's activities
   const updatedActivities = activities.filter((_, i) => i !== idx);
   user.activities = updatedActivities;
@@ -845,6 +851,8 @@ router.post('/admin/withdrawals/:activityId/reject', requireAdmin, async (req, r
       if (idx !== -1) {
         console.log('Found withdrawal activity:', activities[idx]);
   activities[idx].status = 'rejected';
+  // Update status in Activity table for history
+  await Activity.update({ status: 'rejected' }, { where: { id: activityId, type: 'withdrawal' } });
   // Remove the rejected withdrawal activity from user's activities
   const updatedActivities = activities.filter((_, i) => i !== idx);
   user.activities = updatedActivities;
