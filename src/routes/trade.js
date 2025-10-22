@@ -1,6 +1,24 @@
+
 import express from 'express';
 import { Trade, User } from '../models/index.js';
 const router = express.Router();
+
+// Get all trade history for authenticated user
+router.get('/history', async (req, res) => {
+  try {
+    // Assume req.userId is set by auth middleware (if not, fallback to query param)
+    const userId = req.userId || req.query.userId;
+    if (!userId) return res.status(401).json({ error: 'User not authenticated.' });
+    const trades = await Trade.findAll({
+      where: { userId },
+      order: [['openedAt', 'DESC']]
+    });
+    res.json({ trades });
+  } catch (err) {
+    console.error('Fetch trade history error:', err);
+    res.status(500).json({ error: 'Failed to fetch trade history.' });
+  }
+});
 
 // Open a trade
 router.post('/open', async (req, res) => {
