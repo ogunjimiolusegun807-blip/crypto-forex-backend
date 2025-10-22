@@ -26,6 +26,7 @@ router.post('/admin/deposits/:id/approve', requireAdmin, async (req, res) => {
     if (user) {
       user.balance += deposit.amount || 0;
       await user.save();
+      console.log(`Admin approved deposit ${depositId} for user ${user.id}. New balance: ${user.balance}`);
     }
 
     res.json({ success: true, message: 'Deposit approved and user credited.' });
@@ -317,7 +318,9 @@ router.post('/user/trades', requireUser, async (req, res) => {
 router.get('/user/balance', requireUser, async (req, res) => {
   try {
     const user = await User.findByPk(req.userId);
+    console.log('GET /user/balance request for userId=', req.userId, 'found user=', !!user);
     if (!user) return res.status(404).json({ error: 'User not found.' });
+    console.log('Returning balance for user', user.id, user.balance);
     res.json({ balance: user.balance });
   } catch (err) {
     console.error('Get balance error:', err);
@@ -329,13 +332,16 @@ router.get('/user/balance', requireUser, async (req, res) => {
 router.post('/user/balance', requireUser, async (req, res) => {
   try {
     const { balance } = req.body;
+    console.log('POST /user/balance request for userId=', req.userId, 'payload balance=', balance);
     if (typeof balance !== 'number' || isNaN(balance)) {
       return res.status(400).json({ error: 'Invalid balance.' });
     }
     const user = await User.findByPk(req.userId);
+    console.log('Found user for update:', !!user, 'userId=', req.userId);
     if (!user) return res.status(404).json({ error: 'User not found.' });
     user.balance = Math.max(0, balance);
     await user.save();
+    console.log('Updated balance for user', user.id, 'to', user.balance);
     res.json({ success: true, balance: user.balance });
   } catch (err) {
     console.error('Update balance error:', err);
