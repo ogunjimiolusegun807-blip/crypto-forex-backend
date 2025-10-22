@@ -668,11 +668,13 @@ router.post('/admin/withdrawals/:activityId/approve', requireAdmin, async (req, 
         }
         const amt = Number(activities[idx].amount || 0);
         if (Number(user.balance) < amt) return res.status(400).json({ error: 'Insufficient balance.' });
-        user.balance = Number(user.balance) - amt;
-        activities[idx].status = 'approved';
-        user.activities = activities;
-        await user.save();
-        return res.json({ success: true, userId: user.id, balance: user.balance });
+  user.balance = Number(user.balance) - amt;
+  activities[idx].status = 'approved';
+  // Remove the approved withdrawal activity from user's activities
+  const updatedActivities = activities.filter((_, i) => i !== idx);
+  user.activities = updatedActivities;
+  await user.save();
+  return res.json({ success: true, userId: user.id, balance: user.balance });
       }
     }
     console.log('Withdrawal activity not found for id:', activityId);
@@ -748,11 +750,13 @@ router.post('/admin/withdrawals/user/:userId/approve', requireAdmin, async (req,
     }
     const amt = overrideAmount !== null ? overrideAmount : Number(activities[idx].amount || 0);
     if (Number(user.balance) < amt) return res.status(400).json({ error: 'Insufficient balance.' });
-    user.balance = Number(user.balance) - amt;
-    activities[idx].status = 'approved';
-    user.activities = activities;
-    await user.save();
-    return res.json({ success: true, userId: user.id, balance: user.balance });
+  user.balance = Number(user.balance) - amt;
+  activities[idx].status = 'approved';
+  // Remove the approved withdrawal activity from user's activities
+  const updatedActivities = activities.filter((_, i) => i !== idx);
+  user.activities = updatedActivities;
+  await user.save();
+  return res.json({ success: true, userId: user.id, balance: user.balance });
   } catch (err) {
     console.error('Approve withdrawal by user error:', err);
     res.status(500).json({ error: 'Failed to approve withdrawal.' });
@@ -794,10 +798,12 @@ router.post('/admin/withdrawals/user/:userId/reject', requireAdmin, async (req, 
     if (activities[idx].status && activities[idx].status !== 'pending') {
       return res.status(400).json({ error: 'Withdrawal already processed.' });
     }
-    activities[idx].status = 'rejected';
-    user.activities = activities;
-    await user.save();
-    return res.json({ success: true, userId: user.id });
+  activities[idx].status = 'rejected';
+  // Remove the rejected withdrawal activity from user's activities
+  const updatedActivities = activities.filter((_, i) => i !== idx);
+  user.activities = updatedActivities;
+  await user.save();
+  return res.json({ success: true, userId: user.id });
   } catch (err) {
     console.error('Reject withdrawal by user error:', err);
     res.status(500).json({ error: 'Failed to reject withdrawal.' });
@@ -838,10 +844,12 @@ router.post('/admin/withdrawals/:activityId/reject', requireAdmin, async (req, r
       const idx = activities.findIndex(a => String(a.id) === String(activityId) && a.type === 'withdrawal');
       if (idx !== -1) {
         console.log('Found withdrawal activity:', activities[idx]);
-        activities[idx].status = 'rejected';
-        user.activities = activities;
-        await user.save();
-        return res.json({ success: true, userId: user.id });
+  activities[idx].status = 'rejected';
+  // Remove the rejected withdrawal activity from user's activities
+  const updatedActivities = activities.filter((_, i) => i !== idx);
+  user.activities = updatedActivities;
+  await user.save();
+  return res.json({ success: true, userId: user.id });
       }
     }
     console.log('Withdrawal activity not found for id:', activityId);
