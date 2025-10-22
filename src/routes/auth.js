@@ -319,21 +319,30 @@ router.post('/user/trades', requireUser, async (req, res) => {
 router.get('/user/balance', requireUser, async (req, res) => {
   try {
     const user = await User.findByPk(req.userId);
-    console.log('GET /user/balance request for userId=', req.userId, 'found user=', !!user);
-    if (!user) return res.status(404).json({ error: 'User not found.' });
-    // Ensure balance is a valid number. If it's NaN or not set, repair and persist.
+    console.log('[BALANCE] GET /user/balance userId:', req.userId, 'found user:', !!user, 'user:', user ? { id: user.id, email: user.email, balance: user.balance } : null);
+    if (!user) {
+      console.error('[BALANCE] User not found for userId:', req.userId);
+      return res.status(404).json({ error: 'User not found.' });
+    }
     let bal = Number(user.balance);
-    if (Number.isNaN(bal)) {
-      console.warn('User balance is NaN for user', user.id, '- repairing to 0');
+    if (!Number.isFinite(bal) || Number.isNaN(bal)) {
+      console.warn('[BALANCE] Invalid balance for user', user.id, 'raw value:', user.balance, '- repairing to 0');
       user.balance = 0;
       await user.save();
       bal = 0;
     }
-    console.log('Returning balance for user', user.id, bal);
+    // Defensive: never return negative balance
+    if (bal < 0) {
+      console.warn('[BALANCE] Negative balance for user', user.id, 'raw value:', user.balance, '- repairing to 0');
+      user.balance = 0;
+      await user.save();
+      bal = 0;
+    }
+    console.log('[BALANCE] Returning balance for user', user.id, bal);
     res.json({ balance: bal });
   } catch (err) {
-    console.error('Get balance error:', err);
-    res.status(500).json({ error: 'Failed to fetch balance.' });
+    console.error('[BALANCE] Get balance error:', err);
+    res.status(500).json({ error: 'Failed to fetch balance.', details: err?.message || err });
   }
 });
 
