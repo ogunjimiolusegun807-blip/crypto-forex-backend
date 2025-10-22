@@ -3,6 +3,7 @@ import cors from 'cors';
 import authRoutes from './routes/auth.js';
 import profileRoutes from './routes/profileroutes.js';
 import tradeRoutes from './routes/trade.js';
+import marketRoutes from './routes/market.js';
 import { sequelize } from './models/index.js';
 
 
@@ -43,6 +44,7 @@ app.use((req, res, next) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/user', profileRoutes);
 app.use('/api/trade', tradeRoutes);
+app.use('/api/market', marketRoutes);
 // Also mount auth routes at /api so admin routes defined as '/admin/..' inside the auth router
 // are reachable under /api/admin/.. which the frontend expects.
 app.use('/api', authRoutes);
