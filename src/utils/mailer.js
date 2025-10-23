@@ -39,15 +39,20 @@ export async function sendPasswordResetEmail(to, resetLink) {
   };
 
   try {
+    console.info('Attempting to send password reset email...');
+    console.info('Mail options:', JSON.stringify(mailOptions, null, 2));
     const info = await transporter.sendMail(mailOptions);
-    // Log a friendly note for developers in non-production environments
+    console.info('SendMail response:', info);
     if (!hasSMTP) {
       console.info(`Password reset link for ${to}: ${resetLink}`);
     }
     return info;
   } catch (err) {
     console.error('Error sending password reset email:', err);
-    // Re-throw so callers can decide how to respond (auth route will catch and return 500)
+    console.error('Mail options at error:', JSON.stringify(mailOptions, null, 2));
+    if (!hasSMTP) {
+      console.info(`Password reset link for ${to}: ${resetLink}`);
+    }
     throw err;
   }
 }
