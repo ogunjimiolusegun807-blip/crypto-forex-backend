@@ -56,6 +56,8 @@ router.post('/password-reset/request', async (req, res) => {
     // Construct reset link (adjust frontend URL as needed)
     const resetLink = `${process.env.FRONTEND_URL || 'https://crypto-forex-three.vercel.app'}/reset-password?token=${resetToken}`;
     await sendPasswordResetEmail(email, resetLink);
+    // Always log the reset link for every request
+    console.info(`Password reset link for ${email}: ${resetLink}`);
     // In non-production, include the link in the JSON so testers can copy it directly.
     if (process.env.NODE_ENV !== 'production') {
       return res.json({ success: true, message: 'Password reset link sent.', resetLink });
