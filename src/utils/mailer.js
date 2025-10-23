@@ -11,6 +11,27 @@ if (hasSendGrid) {
   console.info('SendGrid API key detected - using SendGrid for outgoing mail');
 }
 
+// Normalize MAIL_FROM so SendGrid receives a proper RFC822 address.
+function normalizeFrom(raw) {
+  if (!raw) return raw;
+  // If already contains angle brackets, assume valid
+  if (/</.test(raw) && />/.test(raw)) return raw.trim();
+  // If it's just an email, return as-is
+  const emailOnlyMatch = raw.trim().match(/^<?([A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,})>?$/i);
+  if (emailOnlyMatch) return emailOnlyMatch[1];
+  // If format is 'Name email@host' (no brackets), try to split last token as email
+  const parts = raw.trim().split(/\s+/);
+  const last = parts[parts.length - 1];
+  if (/^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i.test(last)) {
+    const name = parts.slice(0, -1).join(' ');
+    return `${name} <${last}>`;
+  }
+  // Fallback: return raw trimmed
+  return raw.trim();
+}
+
+const MAIL_FROM = normalizeFrom(process.env.MAIL_FROM || process.env.SMTP_FROM || 'no-reply@elonbroker.com');
+
 const hasSMTP = !!(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS);
 let transporter = null;
 if (hasSendGrid) {
@@ -19,12 +40,12 @@ if (hasSendGrid) {
     sendMail: async (mailOptions) => {
       // sendgrid expects { to, from, subject, text/html }
       const msg = {
-        to: mailOptions.to,
-        from: process.env.MAIL_FROM || mailOptions.from,
-        subject: mailOptions.subject,
-        html: mailOptions.html,
-        text: mailOptions.text,
-      };
+          to: mailOptions.to,
+          from: MAIL_FROM || mailOptions.from,
+          subject: mailOptions.subject,
+          html: mailOptions.html,
+          text: mailOptions.text,
+        };
       console.info('Sending mail via SendGrid. Mail options:', JSON.stringify(msg, null, 2));
       const resp = await sgMail.send(msg);
       // sgMail.send returns an array of responses for legacy reasons
@@ -74,7 +95,7 @@ if (hasSendGrid) {
 
 export async function sendPasswordResetEmail(to, resetLink) {
   const mailOptions = {
-    from: process.env.MAIL_FROM || process.env.SMTP_FROM || 'no-reply@elonbroker.com',
+    from: MAIL_FROM,
     to,
     subject: 'Password Reset Request',
     html: `<p>You requested a password reset. Click the link below to set a new password:</p>
