@@ -37,7 +37,7 @@ router.post('/admin/deposits/:id/approve', requireAdmin, async (req, res) => {
 });
 
 // Request password reset: generates token and sends email
-router.post('/password-reset/request', async (req, res) => {
+router.post('/api/auth/password-reset/request', async (req, res) => {
   const { email } = req.body;
   if (!email) return res.status(400).json({ error: 'Email required.' });
   try {
@@ -68,7 +68,7 @@ router.post('/password-reset/request', async (req, res) => {
 });
 
 // Reset password using token
-router.post('/password-reset/confirm', async (req, res) => {
+router.post('/api/auth/password-reset/confirm', async (req, res) => {
   const { token, newPassword } = req.body;
   if (!token || !newPassword || newPassword.length < 6) {
     return res.status(400).json({ error: 'Token and valid new password required.' });
