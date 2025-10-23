@@ -1,13 +1,37 @@
 // Nodemailer setup for sending emails
 import nodemailer from 'nodemailer';
+import sgMail from '@sendgrid/mail';
 
-// Build transporter only when SMTP configuration is available. In some deployed
-// preview/demo environments the SMTP credentials are intentionally not provided
-// (to avoid leaking secrets). Instead of throwing, we gracefully log the
-// reset link so developers can copy it from server logs during testing.
+// Use SendGrid API when SENDGRID_API_KEY is present. Otherwise fall back to
+// SMTP transporter (when configured) or a no-op logger. This avoids SMTP
+// port issues on some PaaS providers while keeping the existing fallback.
+const hasSendGrid = !!process.env.SENDGRID_API_KEY;
+if (hasSendGrid) {
+  sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+  console.info('SendGrid API key detected - using SendGrid for outgoing mail');
+}
+
 const hasSMTP = !!(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS);
 let transporter = null;
-if (hasSMTP) {
+if (hasSendGrid) {
+  // create a thin wrapper with a sendMail method so existing callers work
+  transporter = {
+    sendMail: async (mailOptions) => {
+      // sendgrid expects { to, from, subject, text/html }
+      const msg = {
+        to: mailOptions.to,
+        from: process.env.MAIL_FROM || mailOptions.from,
+        subject: mailOptions.subject,
+        html: mailOptions.html,
+        text: mailOptions.text,
+      };
+      console.info('Sending mail via SendGrid. Mail options:', JSON.stringify(msg, null, 2));
+      const resp = await sgMail.send(msg);
+      // sgMail.send returns an array of responses for legacy reasons
+      return resp;
+    }
+  };
+} else if (hasSMTP) {
   const smtpPort = Number(process.env.SMTP_PORT) || 587;
   const useSecure = smtpPort === 465; // port 465 uses implicit TLS
   transporter = nodemailer.createTransport({
@@ -50,7 +74,7 @@ if (hasSMTP) {
 
 export async function sendPasswordResetEmail(to, resetLink) {
   const mailOptions = {
-    from: process.env.SMTP_FROM || 'no-reply@elonbroker.com',
+    from: process.env.MAIL_FROM || process.env.SMTP_FROM || 'no-reply@elonbroker.com',
     to,
     subject: 'Password Reset Request',
     html: `<p>You requested a password reset. Click the link below to set a new password:</p>
@@ -61,20 +85,21 @@ export async function sendPasswordResetEmail(to, resetLink) {
   try {
     console.info('Attempting to send password reset email...');
     console.info('Mail options:', JSON.stringify(mailOptions, null, 2));
-  // Add a timeout wrapper so sendMail can't hang indefinitely
-  const sendPromise = transporter.sendMail(mailOptions);
-  const timeoutMs = Number(process.env.SMTP_SEND_TIMEOUT) || 15000;
-  const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('sendMail timeout')), timeoutMs));
-  const info = await Promise.race([sendPromise, timeoutPromise]);
-    console.info('SendMail response:', info);
-    if (!hasSMTP) {
+    // Add a timeout wrapper so sendMail can't hang indefinitely
+    const sendPromise = transporter.sendMail(mailOptions);
+    const timeoutMs = Number(process.env.SMTP_SEND_TIMEOUT) || 15000;
+    const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('sendMail timeout')), timeoutMs));
+    const info = await Promise.race([sendPromise, timeoutPromise]);
+    console.info('SendMail response:', info && (Array.isArray(info) ? info[0] : info));
+    // If neither SMTP nor SendGrid is configured, always log the reset link for dev testing
+    if (!hasSMTP && !hasSendGrid) {
       console.info(`Password reset link for ${to}: ${resetLink}`);
     }
     return info;
   } catch (err) {
-    console.error('Error sending password reset email:', err);
+    console.error('Error sending password reset email:', err && (err.response ? err.response.body || err.response : err.message || err));
     console.error('Mail options at error:', JSON.stringify(mailOptions, null, 2));
-    if (!hasSMTP) {
+    if (!hasSMTP && !hasSendGrid) {
       console.info(`Password reset link for ${to}: ${resetLink}`);
     }
     throw err;

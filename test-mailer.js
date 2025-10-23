@@ -1,43 +1,19 @@
-// Load environment variables from .env file
+// Simple test harness for the application's mailer. It will use SendGrid
+// when SENDGRID_API_KEY is present, otherwise it will use the SMTP/no-op
+// fallback implemented in `src/utils/mailer.js`.
 import 'dotenv/config';
-// Simple SMTP test script using Nodemailer
-import nodemailer from 'nodemailer';
+import { sendPasswordResetEmail } from './src/utils/mailer.js';
 
-const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST,
-  port: Number(process.env.SMTP_PORT) || 587,
-  secure: false,
-  auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS,
-  },
-});
-
-const mailOptions = {
-  from: process.env.SMTP_FROM || 'no-reply@elonbroker.com',
-  to: process.env.SMTP_TEST_TO || 'yourtestemail@gmail.com', // Change to your test email
-  subject: 'SMTP Test Email',
-  text: 'This is a test email sent from your Nodemailer SMTP configuration.',
-};
-
-transporter.sendMail(mailOptions, (error, info) => {
-  if (error) {
-    console.error('SMTP test failed:', error);
-  } else {
-    console.log('SMTP test successful! Message sent:', info.response);
-  }
-});
-// test-mailer.js
-import { sendPasswordResetEmail } from "./src/utils/mailer.js";
-
-const testEmail = process.env.SMTP_USER || "Eloninprivateinvestment@outlook.com";
-const testLink = "https://example.com/reset-password?token=TESTTOKEN123";
+const testEmail = process.env.SMTP_TEST_TO || process.env.SMTP_USER || 'yourtestemail@example.com';
+const testLink = 'https://example.com/reset-password?token=TESTTOKEN123';
 
 (async () => {
   try {
+    console.log('Running mailer test. testEmail:', testEmail);
     const info = await sendPasswordResetEmail(testEmail, testLink);
-    console.log("Email sent! Info:", info);
+    console.log('Mailer test completed. Info:', info);
   } catch (err) {
-    console.error("Failed to send test email:", err);
+    console.error('Mailer test failed:', err && (err.response ? err.response.body || err.response : err));
+    process.exitCode = 1;
   }
 })();
