@@ -41,16 +41,21 @@ router.post('/open', authenticateToken, async (req, res) => {
     await user.save();
     const trade = await Trade.create({ userId, symbol, amount, multiplier, entryPrice, status: 'open', openedAt: new Date() });
 
-    // Create activity for trade
-    await Activity.create({
-      userId,
-      type: 'trade',
-      description: `Opened trade: ${symbol} x${multiplier} @ ${entryPrice}`,
-      amount: -Math.abs(amount),
-      status: 'completed',
-      meta: { tradeId: trade.id, symbol, multiplier, entryPrice },
-      createdAt: new Date()
-    });
+    // Create activity for trade with error handling
+    try {
+      await Activity.create({
+        userId,
+        type: 'trade',
+        description: `Opened trade: ${symbol} x${multiplier} @ ${entryPrice}`,
+        amount: -Math.abs(amount),
+        status: 'completed',
+        meta: { tradeId: trade.id, symbol, multiplier, entryPrice },
+        createdAt: new Date()
+      });
+    } catch (activityErr) {
+      console.error('Error creating trade activity:', activityErr);
+      return res.status(500).json({ error: 'Failed to record trade activity', details: activityErr.message });
+    }
 
     res.json({ trade, balance: user.balance });
   } catch (err) {
