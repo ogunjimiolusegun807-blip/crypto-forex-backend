@@ -1,6 +1,6 @@
 
 import express from 'express';
-import { Trade, User } from '../models/index.js';
+import { Trade, User, Activity } from '../models/index.js';
 import { authenticateToken } from '../middleware/auth.js';
 const router = express.Router();
 
