@@ -694,7 +694,7 @@ router.post('/admin/kyc/:activityId/approve', requireAdmin, async (req, res) => 
       if (kycActivities.length > 0) {
         console.log(`User ${user.id} (${user.email}):`, JSON.stringify(kycActivities, null, 2));
       }
-      const idx = activities.findIndex(a => a.id === activityId && a.type === 'kyc');
+  const idx = activities.findIndex(a => String(a.id) === String(activityId) && a.type === 'kyc');
       if (idx !== -1) {
         // Only approve if status is pending
         if (activities[idx].status && activities[idx].status !== 'pending') {
@@ -729,7 +729,7 @@ router.post('/admin/kyc/:activityId/reject', requireAdmin, async (req, res) => {
       if (kycActivities.length > 0) {
         console.log(`User ${user.id} (${user.email}):`, JSON.stringify(kycActivities, null, 2));
       }
-      const idx = activities.findIndex(a => a.id === activityId && a.type === 'kyc');
+  const idx = activities.findIndex(a => String(a.id) === String(activityId) && a.type === 'kyc');
       if (idx !== -1) {
         // Only reject if status is pending
         if (activities[idx].status && activities[idx].status !== 'pending') {
