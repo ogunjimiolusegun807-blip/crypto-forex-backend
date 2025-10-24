@@ -691,12 +691,18 @@ router.post('/admin/kyc/:activityId/approve', requireAdmin, async (req, res) => 
       const activities = Array.isArray(user.activities) ? user.activities : [];
       const idx = activities.findIndex(a => a.id === activityId && a.type === 'kyc');
       if (idx !== -1) {
-  user.kycStatus = 'verified';
-  // remove the handled kyc activity so it doesn't reappear
-  const updatedActivities = activities.filter((_, i) => i !== idx);
-  user.activities = updatedActivities;
-  await user.save();
-  return res.json({ success: true, userId: user.id });
+        // Only approve if status is pending
+        if (activities[idx].status && activities[idx].status !== 'pending') {
+          return res.json({ success: true, message: 'KYC already processed.', status: activities[idx].status });
+        }
+        user.kycStatus = 'verified';
+        // Update status in Activity table for history
+        await Activity.update({ status: 'verified' }, { where: { id: activityId, type: 'kyc' } });
+        // Remove the handled kyc activity so it doesn't reappear
+        const updatedActivities = activities.filter((_, i) => i !== idx);
+        user.activities = updatedActivities;
+        await user.save();
+        return res.json({ success: true, userId: user.id });
       }
     }
     res.status(404).json({ error: 'KYC activity not found.' });
@@ -715,12 +721,18 @@ router.post('/admin/kyc/:activityId/reject', requireAdmin, async (req, res) => {
       const activities = Array.isArray(user.activities) ? user.activities : [];
       const idx = activities.findIndex(a => a.id === activityId && a.type === 'kyc');
       if (idx !== -1) {
-  user.kycStatus = 'rejected';
-  // remove the handled kyc activity
-  const updatedActivities = activities.filter((_, i) => i !== idx);
-  user.activities = updatedActivities;
-  await user.save();
-  return res.json({ success: true, userId: user.id });
+        // Only reject if status is pending
+        if (activities[idx].status && activities[idx].status !== 'pending') {
+          return res.json({ success: true, message: 'KYC already processed.', status: activities[idx].status });
+        }
+        user.kycStatus = 'rejected';
+        // Update status in Activity table for history
+        await Activity.update({ status: 'rejected' }, { where: { id: activityId, type: 'kyc' } });
+        // Remove the handled kyc activity
+        const updatedActivities = activities.filter((_, i) => i !== idx);
+        user.activities = updatedActivities;
+        await user.save();
+        return res.json({ success: true, userId: user.id });
       }
     }
     res.status(404).json({ error: 'KYC activity not found.' });
