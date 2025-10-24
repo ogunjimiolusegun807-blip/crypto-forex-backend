@@ -256,6 +256,19 @@ router.post('/admin/users/:userId/reset-password', requireAdmin, async (req, res
 import { Op } from 'sequelize';
 
 // Middleware to require user authentication
+// GET all user activities (for Account History)
+router.get('/user/activities', requireUser, async (req, res) => {
+  try {
+    const activities = await Activity.findAll({
+      where: { userId: req.userId },
+      order: [['createdAt', 'DESC']]
+    });
+    res.json(activities);
+  } catch (err) {
+    console.error('Get user activities error:', err);
+    res.status(500).json({ error: 'Failed to fetch activities.' });
+  }
+});
 function requireUser(req, res, next) {
   const authHeader = req.headers.authorization;
   if (!authHeader) return res.status(401).json({ error: 'Authorization header missing.' });
