@@ -687,8 +687,13 @@ router.post('/admin/kyc/:activityId/approve', requireAdmin, async (req, res) => 
   try {
     const { activityId } = req.params;
     const users = await User.findAll();
+    console.log('--- DEBUG: All KYC activities for all users on approve attempt ---');
     for (const user of users) {
       const activities = Array.isArray(user.activities) ? user.activities : [];
+      const kycActivities = activities.filter(a => a.type === 'kyc');
+      if (kycActivities.length > 0) {
+        console.log(`User ${user.id} (${user.email}):`, JSON.stringify(kycActivities, null, 2));
+      }
       const idx = activities.findIndex(a => a.id === activityId && a.type === 'kyc');
       if (idx !== -1) {
         // Only approve if status is pending
@@ -717,8 +722,13 @@ router.post('/admin/kyc/:activityId/reject', requireAdmin, async (req, res) => {
   try {
     const { activityId } = req.params;
     const users = await User.findAll();
+    console.log('--- DEBUG: All KYC activities for all users on reject attempt ---');
     for (const user of users) {
       const activities = Array.isArray(user.activities) ? user.activities : [];
+      const kycActivities = activities.filter(a => a.type === 'kyc');
+      if (kycActivities.length > 0) {
+        console.log(`User ${user.id} (${user.email}):`, JSON.stringify(kycActivities, null, 2));
+      }
       const idx = activities.findIndex(a => a.id === activityId && a.type === 'kyc');
       if (idx !== -1) {
         // Only reject if status is pending
