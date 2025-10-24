@@ -42,7 +42,6 @@ router.post('/open', authenticateToken, async (req, res) => {
     const trade = await Trade.create({ userId, symbol, amount, multiplier, entryPrice, status: 'open', openedAt: new Date() });
 
     // Create activity for trade
-    const { Activity } = require('../models/index.js');
     await Activity.create({
       userId,
       type: 'trade',
